@@ -165,11 +165,12 @@ describe('Categorías y miembros', () => {
 describe('Configuración y reportes', () => {
   test('actualiza y valida la configuración', async () => {
     const { a } = await setup();
-    const ok = await a.put('/api/settings').send({ householdName: 'Los Gómez', currency: 'USD', cutoffDay: 15, alertPct: 90, antLimit: 20 });
+    const ok = await a.put('/api/settings').send({ householdName: 'Los Gómez', currency: 'USD', cutoffDay: 15, alertPct: 90, antLimit: 20, monthlyBudget: 3500000 });
     assert.equal(ok.status, 200);
     assert.equal((await a.get('/api/settings')).body.settings.currency, 'USD');
-    for (const bad of [{ cutoffDay: 31 }, { alertPct: 10 }, { currency: 'XYZ' }, { antLimit: -1 }, { householdName: '' }]) {
-      const r = await a.put('/api/settings').send({ householdName: 'X', currency: 'COP', cutoffDay: 1, alertPct: 80, antLimit: 0, ...bad });
+    assert.equal((await a.get('/api/settings')).body.settings.monthlyBudget, 3500000);
+    for (const bad of [{ cutoffDay: 31 }, { alertPct: 10 }, { currency: 'XYZ' }, { antLimit: -1 }, { monthlyBudget: -1 }, { householdName: '' }]) {
+      const r = await a.put('/api/settings').send({ householdName: 'X', currency: 'COP', cutoffDay: 1, alertPct: 80, antLimit: 0, monthlyBudget: 0, ...bad });
       assert.equal(r.status, 400, JSON.stringify(bad));
     }
   });
@@ -214,6 +215,18 @@ describe('Configuración y reportes', () => {
     assert.equal(s.period.from, '2026-10-15');
     assert.equal(s.period.to, '2026-11-14');
     assert.equal(s.spent, 3000);
+  });
+
+  test('el presupuesto mensual global sustituye el total de categorías para alertas y disponible', async () => {
+    const { a, cat } = await setup();
+    await a.put('/api/settings').send({ householdName: 'X', currency: 'COP', cutoffDay: 1, alertPct: 80, antLimit: 0, monthlyBudget: 100000 });
+    await a.post('/api/transactions').send(tx({ categoryId: cat, amount: 120000, date: '2026-10-10' }));
+    const s = (await a.get('/api/reports/summary?year=2026&month=9')).body;
+    assert.equal(s.monthlyBudget, 100000);
+    assert.equal(s.categoryBudgetTotal, 2430000);
+    assert.equal(s.budgetTotal, 100000);
+    assert.equal(s.available, -20000);
+    assert.equal(s.pct, 120);
   });
 
   test('parámetros de período inválidos → 400', async () => {

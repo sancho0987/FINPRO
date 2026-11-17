@@ -65,7 +65,7 @@ npm test
 - **Movimientos:** crear/editar/eliminar; búsqueda, filtros (tipo, categoría, miembro, período/todo), orden, paginación, exportar CSV.
 - **Familia:** miembros (CRUD) con gasto y porcentaje; gráfico de distribución. Al eliminar un miembro sus movimientos se conservan «sin asignar».
 - **Reportes:** evolución 6/12 meses, top categorías, tabla presupuesto vs. gasto con estado.
-- **Configuración:** nombre del hogar, moneda, **día de corte** (mes financiero), umbral de alerta, límite de gasto hormiga, presupuestos y categorías (CRUD con reasignación), exportar CSV/JSON, borrar todos los datos (pide contraseña).
+- **Configuración:** nombre del hogar, moneda, **día de corte** (mes financiero), presupuesto mensual global, umbral de alerta, límite de gasto hormiga, presupuestos y categorías (CRUD con reasignación), exportar CSV/JSON, borrar todos los datos (pide contraseña). El presupuesto mensual global es opcional: si queda en 0, el resumen conserva como límite la suma de las categorías.
 - **Administración (rol admin):** lista/búsqueda de usuarios, cambiar rol, activar/desactivar, enviar enlace de recuperación, eliminar. El admin **no** puede ver los movimientos de otros usuarios. Protecciones: no auto-degradarse y siempre debe quedar un admin activo.
 - **Interfaz:** tema claro/oscuro, responsive (barra inferior en móvil, riel en tablet), validación en vivo, toasts, diálogos accesibles.
 

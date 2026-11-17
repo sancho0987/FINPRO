@@ -55,7 +55,7 @@ export async function render({ root, isCurrent }) {
       <div class="hero-top">
         <div><div class="label">${over ? 'Excedido sobre el presupuesto' : 'Disponible del presupuesto'}</div>
           <div class="figure ${over ? 'bad' : ''}" id="figure" aria-live="off">${money(Math.abs(s.available))}</div>
-          <div class="caption">${s.budgetTotal > 0 ? html`${spentPct}% usado de <span class="mono">${money(s.budgetTotal)}</span> presupuestados` : html`Aún no defines presupuesto. <a href="#/config">Configúralo aquí</a>.`}</div></div>
+          <div class="caption">${s.budgetTotal > 0 ? html`${spentPct}% usado de <span class="mono">${money(s.budgetTotal)}</span> presupuestados${s.monthlyBudget > 0 ? ' este mes' : ' por categorías'}` : html`Aún no defines presupuesto. <a href="#/config">Configúralo aquí</a>.`}</div></div>
         <dl class="mini-stats">
           <div><dt>Gastado</dt><dd class="neg">${money(s.spent)}</dd></div>
           <div><dt>Ingresos</dt><dd class="pos">${money(s.income)}</dd></div>

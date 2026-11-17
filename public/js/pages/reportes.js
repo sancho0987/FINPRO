@@ -25,6 +25,7 @@ export async function render({ root, isCurrent }) {
     <div class="page-head"><div><h1>Reportes</h1><p>Análisis de ${label}</p></div>
       <div class="actions"><a class="btn btn-ghost" download href="${api.url('/api/transactions/export.csv', { from, to })}">${raw(icon('download'))}Exportar período (CSV)</a></div></div>
     <div class="kpis">
+      <dl class="kpi"><dt>Presupuesto mensual</dt><dd>${s.monthlyBudget > 0 ? money(s.monthlyBudget) : money(s.categoryBudgetTotal)}</dd></dl>
       <dl class="kpi"><dt>Gastado</dt><dd style="color:var(--danger)">${money(s.spent)}</dd></dl>
       <dl class="kpi"><dt>Ingresos</dt><dd style="color:var(--brand)">${money(s.income)}</dd></dl>
       <dl class="kpi"><dt>Balance</dt><dd style="color:${s.balance >= 0 ? 'var(--brand)' : 'var(--danger)'}">${money(s.balance, { sign: true })}</dd></dl>

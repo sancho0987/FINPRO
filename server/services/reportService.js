@@ -19,7 +19,11 @@ function summary(userId, { year, month, today }) {
     )
     .get(userId, p.from, p.to);
 
-  const budgetTotal = db.prepare('SELECT COALESCE(SUM(budget_cents),0) b FROM categories WHERE user_id = ?').get(userId).b;
+  const categoryBudgetTotal = db.prepare('SELECT COALESCE(SUM(budget_cents),0) b FROM categories WHERE user_id = ?').get(userId).b;
+  // El presupuesto mensual, cuando se define, es el límite global. Con 0 se
+  // mantiene el comportamiento previo basado en la suma de categorías.
+  const monthlyBudget = toCents(cfg.monthlyBudget);
+  const budgetTotal = monthlyBudget > 0 ? monthlyBudget : categoryBudgetTotal;
 
   const byCategory = db
     .prepare(
@@ -85,6 +89,8 @@ function summary(userId, { year, month, today }) {
   return {
     period: { from: p.from, to: p.to, year: p.year, month: p.month },
     budgetTotal: fromCents(budgetTotal),
+    monthlyBudget: fromCents(monthlyBudget),
+    categoryBudgetTotal: fromCents(categoryBudgetTotal),
     spent: fromCents(totals.spent),
     income: fromCents(totals.income),
     balance: fromCents(totals.income - totals.spent),

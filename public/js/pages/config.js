@@ -19,6 +19,7 @@ export async function render({ root }) {
           <div class="field"><label for="c-mon">Moneda</label><select class="select" id="c-mon" name="currency">${Object.entries(CURRENCIES).map(([k, l]) => html`<option value="${k}" ${raw(k === c.currency ? 'selected' : '')}>${l}</option>`)}</select>
             <span class="hint">Cambiar la moneda solo cambia el símbolo: no convierte tus montos.</span><span class="error"></span></div>
           <div class="field"><label for="c-corte">Día de corte mensual</label><input class="input mono" id="c-corte" name="cutoffDay" type="number" min="1" max="28" step="1" value="${c.cutoffDay}"><span class="hint">Tu mes financiero empieza este día (1 = mes calendario). Útil si cobras el 15 o el 30.</span><span class="error"></span></div>
+          <div class="field"><label for="c-presupuesto">Presupuesto mensual total</label><input class="input mono" id="c-presupuesto" name="monthlyBudget" type="number" min="0" step="0.01" value="${c.monthlyBudget}"><span class="hint">Es el límite global del período. Déjalo en 0 para usar la suma de las categorías.</span><span class="error"></span></div>
         </section>
         <section class="panel"><div class="panel-head"><h2>Alertas</h2></div>
           <div class="field"><label for="c-alerta">Avisarme al llegar al (% del presupuesto)</label><input class="input mono" id="c-alerta" name="alertPct" type="number" min="50" max="100" step="1" value="${c.alertPct}"><span class="error"></span></div>
@@ -53,6 +54,7 @@ export async function render({ root }) {
     cutoffDay: (x) => (!Number.isInteger(Number(x)) || Number(x) < 1 || Number(x) > 28 ? 'Elige un día entre 1 y 28.' : ''),
     alertPct: (x) => (!Number.isInteger(Number(x)) || Number(x) < 50 || Number(x) > 100 ? 'Debe estar entre 50 y 100.' : ''),
     antLimit: (x) => (x === '' || Number(x) < 0 ? 'Ingresa 0 o un monto positivo.' : ''),
+    monthlyBudget: (x) => (x === '' || Number(x) < 0 ? 'Ingresa 0 o un monto positivo.' : ''),
   };
   liveValidate(form, rules);
 
@@ -65,7 +67,7 @@ export async function render({ root }) {
     if (Object.keys(errs).length) { if (errs._) setFormError(form, errs._); showFieldErrors(form, errs); return; }
     const btn = $('#save-cfg', root); setLoading(btn, true);
     try {
-      await api.put('/api/settings', { householdName: form.elements.householdName.value.trim(), currency: form.elements.currency.value, cutoffDay: Number(form.elements.cutoffDay.value), alertPct: Number(form.elements.alertPct.value), antLimit: Number(form.elements.antLimit.value) });
+      await api.put('/api/settings', { householdName: form.elements.householdName.value.trim(), currency: form.elements.currency.value, cutoffDay: Number(form.elements.cutoffDay.value), alertPct: Number(form.elements.alertPct.value), antLimit: Number(form.elements.antLimit.value), monthlyBudget: Number(form.elements.monthlyBudget.value) });
       await api.put('/api/categories/budgets', { budgets });
       toast('Cambios guardados');
       app.period = null; notifyChange(true);

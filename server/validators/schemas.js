@@ -36,6 +36,8 @@ const settings = z.object({
   cutoffDay: z.number({ message: 'El día de corte debe ser un número.' }).int('El día de corte debe ser entero.').min(1, 'El día de corte va de 1 a 28.').max(28, 'El día de corte va de 1 a 28.'),
   alertPct: z.number({ message: 'El porcentaje de alerta debe ser un número.' }).int('Debe ser un número entero.').min(50, 'La alerta va de 50% a 100%.').max(100, 'La alerta va de 50% a 100%.'),
   antLimit: c.money('El límite de gasto hormiga', { allowZero: true }),
+  // Opcional por compatibilidad con clientes ya instalados; la interfaz actual siempre lo envía.
+  monthlyBudget: c.money('El presupuesto mensual', { allowZero: true }).optional(),
 });
 
 const category = z.object({
