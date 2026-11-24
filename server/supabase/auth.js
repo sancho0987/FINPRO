@@ -14,6 +14,18 @@ async function authRequest(path, { method = 'POST', body, accessToken } = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = String(data.msg || data.message || data.error_description || '');
+    const errorCode = String(data.code || data.error_code || '').toLowerCase();
+    const safeCode = /^[a-z0-9_.-]{1,64}$/.test(errorCode) ? errorCode : 'unknown';
+    // Log only the fixed endpoint, status, and provider error code. Never log the
+    // request body, email, password, access token, or raw provider message.
+    console.warn(`[supabase-auth] ${method} ${path.split('?')[0]} status=${response.status} code=${safeCode}`);
+
+    if (errorCode === 'email_address_not_authorized' || /email address not authorized/i.test(message)) {
+      throw new AppError(503, 'AUTH_EMAIL_PROVIDER_UNCONFIGURED', 'Supabase no puede enviar la confirmación a este correo. El administrador debe configurar SMTP personalizado en Supabase.');
+    }
+    if (errorCode === 'over_email_send_rate_limit' || /email rate limit exceeded/i.test(message)) {
+      throw new AppError(429, 'AUTH_EMAIL_RATE_LIMIT', 'Supabase alcanzó el límite temporal de correos. Inténtalo más tarde o configura SMTP personalizado.');
+    }
     if (response.status === 400 || response.status === 422) {
       const translated = /already registered/i.test(message) ? 'Ya existe una cuenta con ese correo.'
         : /invalid login credentials/i.test(message) ? 'Correo o contraseña incorrectos.'
