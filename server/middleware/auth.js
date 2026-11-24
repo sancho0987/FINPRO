@@ -43,6 +43,7 @@ function requireAdmin(req, _res, next) {
 
 // Para páginas HTML privadas: redirige a login si no hay sesión válida
 const pageAuth = (adminOnly = false) => (req, res, next) => {
+  if (config.useSupabase) return require('../supabase/session').pageSupabaseAuth(req, res, next, adminOnly);
   const s = loadSession(req);
   if (!s) return res.redirect('/login.html?next=' + encodeURIComponent(req.path));
   if (adminOnly && s.user.role !== 'admin') return res.redirect('/app');
@@ -52,6 +53,7 @@ const pageAuth = (adminOnly = false) => (req, res, next) => {
 
 // Páginas de login/registro: si ya hay sesión, ir directo a la app
 const redirectIfLoggedIn = (req, res, next) => {
+  if (config.useSupabase) return require('../supabase/session').redirectIfSupabaseLoggedIn(req, res, next);
   if (loadSession(req)) return res.redirect('/app');
   next();
 };

@@ -20,11 +20,13 @@ const config = {
   root,
   publicDir: path.join(root, 'public'),
   port: int(env.PORT, 3000),
-  appUrl: (env.APP_URL || `http://localhost:${int(env.PORT, 3000)}`).replace(/\/+$/, ''),
+  appUrl: (env.APP_URL || env.RENDER_EXTERNAL_URL || `http://localhost:${int(env.PORT, 3000)}`).replace(/\/+$/, ''),
   databasePath:
     env.DATABASE_PATH === ':memory:'
       ? ':memory:'
       : path.resolve(root, env.DATABASE_PATH || './data/finpro.db'),
+  supabaseUrl: (env.SUPABASE_URL || '').replace(/\/+$/, ''),
+  supabaseAnonKey: env.SUPABASE_ANON_KEY || '',
   sessionTtlDays: Math.max(1, int(env.SESSION_TTL_DAYS, 7)),
   bcryptRounds: Math.min(15, Math.max(4, int(env.BCRYPT_ROUNDS, 12))),
   allowRegistration: bool(env.ALLOW_REGISTRATION, true),
@@ -44,6 +46,7 @@ const config = {
     from: env.MAIL_FROM || 'FINPRO <no-reply@finpro.local>',
   },
 };
+config.useSupabase = Boolean(config.supabaseUrl && config.supabaseAnonKey && !config.isTest);
 config.smtp.enabled = Boolean(config.smtp.host);
 
 module.exports = config;

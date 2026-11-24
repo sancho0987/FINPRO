@@ -47,9 +47,9 @@ export async function render({ root, isCurrent }) {
     <div class="page-head"><div><h1>Resumen</h1><p>${label}</p></div>
       <div class="actions"><button class="btn btn-primary hide-mobile" type="button" data-add>${raw(icon('plus'))}Agregar gasto</button></div></div>
     ${onboarding ? html`<div class="panel mb"><div class="empty"><div class="em">👋</div><h3>Empieza registrando tu primer movimiento</h3>
-      <p>Anota un gasto o un ingreso y verás aquí tu presupuesto, gráficos y alertas. También puedes cargar datos de ejemplo para explorar.</p>
+      <p>Anota un gasto o un ingreso y verás aquí tu presupuesto, gráficos y alertas.</p>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary" type="button" data-add>${raw(icon('plus'))}Registrar movimiento</button>
-      <button class="btn btn-ghost" type="button" id="demo-btn">Cargar datos de ejemplo</button></div></div></div>` : ''}
+      ${app.demoEnabled ? html`<button class="btn btn-ghost" type="button" id="demo-btn">Cargar datos de ejemplo</button>` : ''}</div></div></div>` : ''}
     ${alerts}
     <section class="hero" aria-label="Estado del presupuesto">
       <div class="hero-top">
@@ -92,7 +92,7 @@ export async function render({ root, isCurrent }) {
   root.addEventListener('click', async (e) => {
     if (e.target.closest('[data-add]')) return openTxModal();
     const row = e.target.closest('[data-edit-tx]');
-    if (row) return openTxModal(recent.items.find((t) => t.id === Number(row.dataset.editTx)));
+    if (row) return openTxModal(recent.items.find((t) => String(t.id) === row.dataset.editTx));
     if (e.target.closest('#demo-btn')) {
       const btn = $('#demo-btn', root);
       setLoading(btn, true);

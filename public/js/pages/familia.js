@@ -43,7 +43,7 @@ export async function render({ root, isCurrent }) {
   }
   root.addEventListener('click', (e) => {
     if (e.target.closest('[data-add-member]')) return openMemberModal();
-    const ed = e.target.closest('[data-edit]'); if (ed) return openMemberModal(app.members.find((m) => m.id === Number(ed.dataset.edit)));
-    const del = e.target.closest('[data-del]'); if (del) return deleteMember(app.members.find((m) => m.id === Number(del.dataset.del)));
+    const ed = e.target.closest('[data-edit]'); if (ed) return openMemberModal(app.members.find((m) => String(m.id) === ed.dataset.edit));
+    const del = e.target.closest('[data-del]'); if (del) return deleteMember(app.members.find((m) => String(m.id) === del.dataset.del));
   });
 }

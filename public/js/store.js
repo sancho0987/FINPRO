@@ -2,7 +2,7 @@
 import { api } from './api.js';
 import { setCurrency, currentPeriod } from './utils.js';
 
-export const app = { user: null, settings: null, categories: [], members: [], hasTransactions: false, period: null };
+export const app = { user: null, settings: null, categories: [], members: [], hasTransactions: false, demoEnabled: true, period: null };
 export const bus = new EventTarget();
 
 export async function loadMeta() {
@@ -12,6 +12,7 @@ export async function loadMeta() {
   app.categories = b.categories;
   app.members = b.members;
   app.hasTransactions = b.hasTransactions;
+  app.demoEnabled = b.demoEnabled !== false;
   setCurrency(b.settings.currency);
   if (!app.period) app.period = currentPeriod(b.settings.cutoffDay);
   return b;

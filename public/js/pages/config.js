@@ -38,7 +38,7 @@ export async function render({ root }) {
     <section class="panel mb"><div class="panel-head"><h2>Tus datos</h2></div>
       <div class="action-row"><div><b>Exportar movimientos</b><span>Descarga todos tus movimientos en CSV (Excel) o todo en JSON.</span></div>
         <div style="display:flex;gap:8px"><a class="btn btn-ghost btn-sm" download href="/api/transactions/export.csv">${raw(icon('download'))}CSV</a><a class="btn btn-ghost btn-sm" download href="/api/data/export.json">${raw(icon('download'))}JSON</a></div></div>
-      ${app.hasTransactions ? '' : html`<div class="action-row"><div><b>Datos de ejemplo</b><span>Carga una familia y movimientos de muestra para explorar la app.</span></div><button class="btn btn-ghost btn-sm" type="button" id="demo">Cargar ejemplo</button></div>`}
+      ${app.demoEnabled && !app.hasTransactions ? html`<div class="action-row"><div><b>Datos de ejemplo</b><span>Carga una familia y movimientos de muestra para explorar la app.</span></div><button class="btn btn-ghost btn-sm" type="button" id="demo">Cargar ejemplo</button></div>` : ''}
     </section>
     <section class="panel danger-zone"><div class="panel-head"><h2>Zona de peligro</h2></div>
       <div class="action-row"><div><b>Borrar todos mis datos</b><span>Elimina movimientos y miembros, y restablece categorías y configuración. No se puede deshacer.</span></div>
@@ -60,7 +60,7 @@ export async function render({ root }) {
     e.preventDefault();
     clearFieldErrors(form); setFormError(form, '');
     const errs = runRules(form, rules);
-    const budgets = $$('[data-budget]', root).map((i) => ({ id: Number(i.dataset.budget), budget: Number(i.value || 0) }));
+    const budgets = $$('[data-budget]', root).map((i) => ({ id: i.dataset.budget, budget: Number(i.value || 0) }));
     if (budgets.some((b) => !(b.budget >= 0))) errs._ = 'Revisa los presupuestos: no pueden ser negativos.';
     if (Object.keys(errs).length) { if (errs._) setFormError(form, errs._); showFieldErrors(form, errs); return; }
     const btn = $('#save-cfg', root); setLoading(btn, true);
@@ -74,8 +74,8 @@ export async function render({ root }) {
 
   root.addEventListener('click', async (e) => {
     if (e.target.closest('#new-cat')) return openCategoryModal();
-    const ed = e.target.closest('[data-edit-cat]'); if (ed) return openCategoryModal(app.categories.find((k) => k.id === Number(ed.dataset.editCat)));
-    const del = e.target.closest('[data-del-cat]'); if (del) return deleteCategory(app.categories.find((k) => k.id === Number(del.dataset.delCat)));
+    const ed = e.target.closest('[data-edit-cat]'); if (ed) return openCategoryModal(app.categories.find((k) => String(k.id) === ed.dataset.editCat));
+    const del = e.target.closest('[data-del-cat]'); if (del) return deleteCategory(app.categories.find((k) => String(k.id) === del.dataset.delCat));
     if (e.target.closest('#demo')) { try { await api.post('/api/data/demo', { today: new Date().toLocaleDateString('en-CA') }); toast('Datos de ejemplo cargados'); notifyChange(true); } catch (ex) { toast(ex.message, 'error'); } }
     if (e.target.closest('#wipe')) {
       await passwordDialog({ title: 'Borrar todos los datos', message: 'Se eliminarán todos tus movimientos y miembros, y se restablecerán categorías y configuración. Confirma con tu contraseña.', confirmText: 'Borrar todo',

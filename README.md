@@ -2,11 +2,11 @@
 
 Aplicación web para gestionar las finanzas personales y familiares: presupuesto por categoría, movimientos (gastos e ingresos), miembros de la familia, gastos hormiga, reportes y panel de administración.
 
-**Stack:** Node.js + Express · SQLite (módulo `node:sqlite` incluido en Node, sin compilar nada) · Frontend en HTML/CSS/JavaScript (módulos ES, sin framework) · Chart.js. Se conservó la tecnología del prototipo original (JS vanilla + Chart.js); el prototipo original se guarda en `legacy/FINPRO.original.html`.
+**Stack:** Node.js + Express · PostgreSQL en Supabase para despliegues con `SUPABASE_URL` y `SUPABASE_ANON_KEY`; SQLite local continúa disponible cuando no se configuran · Frontend en HTML/CSS/JavaScript (módulos ES, sin framework) · Chart.js. Se conservó la tecnología del prototipo original (JS vanilla + Chart.js); el prototipo original se guarda en `legacy/FINPRO.original.html`.
 
 ## 1. Requisitos
 - **Node.js 22.13 o superior** (`node -v`; recomendado la versión LTS actual) y npm.
-- No necesitas instalar ningún motor de base de datos ni herramientas de compilación: usa SQLite incluido en Node (un archivo). Node 22 puede mostrar un aviso «SQLite is an experimental feature»; es normal e inofensivo.
+- Node 22 incluye SQLite para el modo local. El despliegue usa Supabase PostgreSQL y requiere las dos variables descritas abajo.
 
 ## 2. Instalación
 ```bash
@@ -14,17 +14,22 @@ cd FINPRO
 npm install
 cp .env.example .env        # en Windows: copy .env.example .env
 ```
-Edita `.env` si quieres cambiar el puerto, la URL pública o configurar el correo (ver sección 6). Para probar en tu computador los valores por defecto sirven tal cual.
+Edita `.env` para elegir el modo y la URL pública. Con las variables de Supabase configuradas, FINPRO utiliza Supabase Auth y PostgreSQL; sin ellas conserva el modo SQLite local.
 
 ## 3. Base de datos
-No hay que crearla a mano: al iniciar el servidor se crea el archivo `data/finpro.db` y se aplican las migraciones (`server/db/migrations/*.sql`) automáticamente. Para ejecutarlas por separado:
+En modo SQLite local, al iniciar el servidor se crea `data/finpro.db`; las migraciones locales están en `server/db/migrations/` y `npm run migrate` las ejecuta por separado. En Supabase, aplica los archivos `supabase/migrations/*.sql` en orden con el SQL Editor o Supabase CLI.
+
+El esquema Supabase contiene `profiles`, `households`, `household_members`, `family_members`, `categories`, `incomes`, `expenses` y `budgets`. La vista `transactions` unifica ingresos y gastos. Los montos se guardan en centavos. Las tablas tienen RLS; perfiles, movimientos y presupuestos quedan restringidos al usuario o hogar asociado.
+
+Variables requeridas para el modo Supabase:
 ```bash
-npm run migrate
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<publishable-key>
 ```
-**Tablas:** `users`, `sessions`, `password_resets`, `settings` (1–1 con usuario), `categories`, `members`, `transactions` (relacionadas con `users` por `user_id`, con borrado en cascada). Los montos se guardan en centavos (enteros).
+La clave publicable se usa solo desde el servidor y se combina con sesiones Supabase Auth en cookies `httpOnly`. Nunca configures `service_role` ni una clave `secret` en la aplicación. Supabase envía los correos de confirmación y recuperación; configura las URL de redirección de Auth para los dominios local y desplegado.
 
 ## 4. Crear el primer administrador
-Por seguridad nadie se vuelve administrador desde el registro público. Crea el primero por consola:
+En SQLite local, crea el primer administrador por consola:
 ```bash
 npm run create-admin
 # o, sin preguntas:
@@ -37,11 +42,10 @@ Te pedirá la contraseña (mínimo 8 caracteres, con letras y números). Si el c
 npm start          # producción/uso normal
 npm run dev        # recarga automática al editar el servidor
 ```
-Abre **http://localhost:3000** — el backend sirve también el frontend, no hay que iniciar nada más.
-Flujo: *Crear cuenta* → entras al resumen → registra movimientos (o pulsa «Cargar datos de ejemplo»).
+Abre **http://localhost:3000** — el backend sirve también el frontend, no hay que iniciar nada más. En SQLite local puedes cargar datos de muestra; están desactivados cuando se usa Supabase.
 
 ## 6. Recuperación de contraseña y correo (servicio externo)
-El enlace de recuperación se envía por correo. Sin SMTP configurado, **el enlace se imprime en la consola del servidor** (útil en desarrollo). Para producción configura en `.env` un servicio SMTP (Gmail con *contraseña de aplicación*, Brevo, Mailgun, etc.):
+En SQLite, sin SMTP configurado el enlace de recuperación se imprime en la consola (útil en desarrollo). En Supabase, la confirmación de cuenta y la recuperación usan el servicio de correo de Supabase; define su URL de redirección para `APP_URL` y el callback `/reset.html`. Para producción con SQLite configura SMTP en `.env`:
 ```
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -86,4 +90,4 @@ legacy/  prototipo original (FINPRO.original.html)
 ```
 
 ## 11. Despliegue (notas)
-Define `NODE_ENV=production`, `APP_URL` con tu dominio HTTPS, `TRUST_PROXY=1` si hay proxy inverso, SMTP real, y respalda periódicamente `data/finpro.db`. Para varios servidores o mucho tráfico, migra a PostgreSQL/MySQL (la capa `models/` concentra todo el SQL).
+Render: conecta el repositorio usando el blueprint `render.yaml` (build `npm ci`, start `npm start`, comprobación `/api/health`, despliegue automático desactivado). Completa `SUPABASE_URL` y `SUPABASE_ANON_KEY`; `APP_URL` usa automáticamente `RENDER_EXTERNAL_URL` y se puede definir manualmente si se configura un dominio propio. Agrega el dominio HTTPS de Render a las URL de redirección de Supabase Auth, incluyendo `/reset.html`. Habilita el despliegue manual cuando hayan terminado las pruebas autenticadas. SQLite no es persistente entre despliegues de Render y no debe usarse como base de producción.

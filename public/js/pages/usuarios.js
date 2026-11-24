@@ -49,7 +49,7 @@ export async function render({ root, isCurrent }) {
   root.__list = list; root.__redo = redo;
   if (root.__bound) return;
   root.__bound = true;
-  const byId = (id) => root.__list.items.find((u) => u.id === Number(id));
+  const byId = (id) => root.__list.items.find((u) => String(u.id) === String(id));
 
   root.addEventListener('change', async (e) => {
     const redo = root.__redo;

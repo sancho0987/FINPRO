@@ -52,6 +52,7 @@ if (page === 'login') {
   api.get('/api/public-config').then((c) => { if (!c.allowRegistration) $('#register-link').hidden = true; }).catch(() => {});
   const params = new URLSearchParams(location.search);
   if (params.get('expired')) setFormError(form, 'Tu sesión expiró. Inicia sesión de nuevo.');
+  if (params.get('registered')) toast('Cuenta creada. Confirma tu correo antes de iniciar sesión.');
   if (params.get('reset')) toast('Contraseña actualizada. Inicia sesión.');
   const rules = { email: v.email, password: v.required('La contraseña') };
   liveValidate(form, { email: v.email });
@@ -69,7 +70,7 @@ if (page === 'register') {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     submit(rules, () => api.post('/api/auth/register', { name: form.elements.name.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value }, { silent401: true }),
-      () => { location.href = '/app'; });
+      (result) => { location.href = result.message ? '/login.html?registered=1' : '/app'; });
   });
 }
 
@@ -83,14 +84,20 @@ if (page === 'forgot') {
 }
 
 if (page === 'reset') {
-  const token = new URLSearchParams(location.search).get('token');
+  const params = new URLSearchParams(location.search);
+  const fragment = new URLSearchParams(location.hash.slice(1));
+  const token = params.get('token') || params.get('token_hash');
+  const accessToken = fragment.get('access_token');
+  const recovery = fragment.get('type') === 'recovery';
   bindStrength();
-  if (!token) { form.hidden = true; $('.lead').textContent = ''; setFormError(form, ''); $('#back').insertAdjacentHTML('beforebegin', '<div class="form-error">El enlace no es válido. Solicita uno nuevo desde “¿Olvidaste tu contraseña?”.</div>'); }
+  if (!token && !(accessToken && recovery)) { form.hidden = true; $('.lead').textContent = ''; setFormError(form, ''); $('#back').insertAdjacentHTML('beforebegin', '<div class="form-error">El enlace no es válido. Solicita uno nuevo desde “¿Olvidaste tu contraseña?”.</div>'); }
   const rules = { password: v.password, confirm: confirmRule() };
   liveValidate(form, rules);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(rules, () => api.post('/api/auth/reset-password', { token, password: form.elements.password.value }, { silent401: true }),
+    submit(rules, () => token
+      ? api.post('/api/auth/reset-password', { token, password: form.elements.password.value }, { silent401: true })
+      : api.post('/api/auth/complete-recovery', { accessToken, password: form.elements.password.value }, { silent401: true }),
       () => { form.hidden = true; $('#back').hidden = true; $('#done').hidden = false; $('.lead').hidden = true; document.querySelector('.auth-card > h2').hidden = true; history.replaceState(null, '', '/reset.html'); });
   });
 }

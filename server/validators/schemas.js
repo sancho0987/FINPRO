@@ -65,8 +65,8 @@ const transaction = z.object({
   description: c.text('La descripción', 120),
   note: c.optionalText('La nota', 300),
   date: c.dateStr,
-  categoryId: z.number({ message: 'Elige una categoría.' }).int().positive('Elige una categoría.'),
-  memberId: z.number().int().positive().nullable().optional(),
+  categoryId: c.id,
+  memberId: z.union([c.id, z.null()]).optional(),
 });
 
 const txQuery = z.object({
