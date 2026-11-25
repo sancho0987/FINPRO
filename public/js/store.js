@@ -2,8 +2,12 @@
 import { api } from './api.js';
 import { setCurrency, currentPeriod } from './utils.js';
 
-export const app = { user: null, settings: null, categories: [], members: [], hasTransactions: false, demoEnabled: true, period: null };
+export const app = { user: null, settings: null, categories: [], members: [], householdId: null, householdRole: null, hasTransactions: false, demoEnabled: true, period: null };
 export const bus = new EventTarget();
+
+// SQLite keeps each personal account's data isolated; Supabase scopes shared
+// settings to the selected household and grants edits only to its managers.
+export const canManageHousehold = () => !app.householdId || ['owner', 'admin'].includes(app.householdRole);
 
 export async function loadMeta() {
   const b = await api.get('/api/bootstrap');
@@ -11,6 +15,8 @@ export async function loadMeta() {
   app.settings = b.settings;
   app.categories = b.categories;
   app.members = b.members;
+  app.householdId = b.householdId || null;
+  app.householdRole = b.householdRole || null;
   app.hasTransactions = b.hasTransactions;
   app.demoEnabled = b.demoEnabled !== false;
   setCurrency(b.settings.currency);

@@ -51,6 +51,8 @@ async function submit(rules, call, onOk) {
 if (page === 'login') {
   api.get('/api/public-config').then((c) => { if (!c.allowRegistration) $('#register-link').hidden = true; }).catch(() => {});
   const params = new URLSearchParams(location.search);
+  const registerLink = $('#register-link a');
+  if (registerLink && params.get('next')) registerLink.href = `/register.html?next=${encodeURIComponent(safeNext(params.get('next')))}`;
   if (params.get('expired')) setFormError(form, 'Tu sesión expiró. Inicia sesión de nuevo.');
   if (params.get('registered')) toast('Cuenta creada. Confirma tu correo antes de iniciar sesión.');
   if (params.get('reset')) toast('Contraseña actualizada. Inicia sesión.');
@@ -64,13 +66,17 @@ if (page === 'login') {
 }
 
 if (page === 'register') {
+  const params = new URLSearchParams(location.search);
+  const returnTo = safeNext(params.get('next'));
+  const loginLink = document.querySelector('.auth-links a');
+  if (loginLink && params.get('next')) loginLink.href = `/login.html?next=${encodeURIComponent(returnTo)}`;
   bindStrength();
   const rules = { name: (x) => (x.trim().length < 2 ? 'Escribe tu nombre (mínimo 2 letras).' : ''), email: v.email, password: v.password, confirm: confirmRule() };
   liveValidate(form, rules);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     submit(rules, () => api.post('/api/auth/register', { name: form.elements.name.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value }, { silent401: true }),
-      (result) => { location.href = result.message ? '/login.html?registered=1' : '/app'; });
+      (result) => { location.href = result.message ? `/login.html?registered=1&next=${encodeURIComponent(returnTo)}` : returnTo; });
   });
 }
 

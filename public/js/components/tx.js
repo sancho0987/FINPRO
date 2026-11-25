@@ -13,7 +13,7 @@ export function txRow(t) {
 
 // Estado de uso de presupuesto
 export function budgetStatus(spent, budget, alertPct) {
-  if (!budget) return spent > 0 ? { key: 'none', label: 'Sin presupuesto', cls: 'info', pct: null } : { key: 'idle', label: 'Sin uso', cls: '', pct: 0 };
+  if (!budget) return { key: 'none', label: 'Sin presupuesto', cls: 'info', pct: null };
   const pct = Math.round((spent / budget) * 100);
   if (pct >= 100) return { key: 'over', label: 'Excedido', cls: 'bad', pct };
   if (pct >= alertPct) return { key: 'warn', label: 'En alerta', cls: 'warn', pct };

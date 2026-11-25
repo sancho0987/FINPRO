@@ -43,7 +43,9 @@ async function loadSupabaseSession(req, res) {
   }
 
   const db = createSupabase(session ? session.access_token : access);
-  const membership = await db.from('household_members').select('household_id,role').eq('user_id', user.id).maybeSingle();
+  // Production intentionally permits one household per user (UNIQUE user_id).
+  const membership = await db.from('household_members').select('household_id,role')
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle();
   if (membership.error || !membership.data) return null;
   req.supabase = db;
   req.householdId = membership.data.household_id;
@@ -74,7 +76,7 @@ async function requireSupabaseAuth(req, res, next) {
 async function pageSupabaseAuth(req, res, next, adminOnly = false) {
   try {
     const session = await loadSupabaseSession(req, res);
-    if (!session) return res.redirect('/login.html?next=' + encodeURIComponent(req.path));
+    if (!session) return res.redirect('/login.html?next=' + encodeURIComponent(req.originalUrl || req.path));
     if (adminOnly && req.user.role !== 'admin') return res.redirect('/app');
     next();
   } catch (error) { next(error); }
@@ -82,7 +84,9 @@ async function pageSupabaseAuth(req, res, next, adminOnly = false) {
 
 async function redirectIfSupabaseLoggedIn(req, res, next) {
   try {
-    if (await loadSupabaseSession(req, res)) return res.redirect('/app');
+    if (await loadSupabaseSession(req, res)) {
+      return res.redirect('/app');
+    }
     next();
   } catch (error) { next(error); }
 }

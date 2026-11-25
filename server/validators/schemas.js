@@ -59,6 +59,7 @@ const member = z.object({
   color: c.color,
 });
 
+
 const transaction = z.object({
   type: z.enum(['gasto', 'ingreso'], { message: 'Tipo inválido.' }),
   amount: c.money('El monto'),

@@ -126,6 +126,7 @@ async function changePassword(req, res) {
 async function deleteAccount(req, res) {
   await authRequest('/token?grant_type=password', { body: { email: req.user.email, password: req.valid.body.password } });
   const { error } = await req.supabase.rpc('delete_own_account');
+  if (error?.code === '55000') throw new AppError(409, 'ACCOUNT_DELETE_BLOCKED', 'No se puede eliminar esta cuenta porque dejaría movimientos o el hogar sin una atribución y titularidad seguras. Conserva la cuenta o transfiere la titularidad; no se modificaron datos.');
   if (error) throw new AppError(400, 'ACCOUNT_DELETE', 'No se pudo eliminar la cuenta.');
   clearSessionCookies(res);
   res.json({ ok: true });

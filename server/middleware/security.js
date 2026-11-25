@@ -25,7 +25,7 @@ const helmetMw = () =>
     },
     hsts: config.isProd && config.cookieSecure,
     crossOriginEmbedderPolicy: false,
-    referrerPolicy: { policy: 'same-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
   });
 
 // Defensa CSRF: SameSite=Lax + cabecera personalizada (no se puede enviar entre sitios sin CORS)

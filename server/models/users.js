@@ -1,5 +1,6 @@
 'use strict';
 const { getDb } = require('../db');
+const { conflict } = require('../utils/errors');
 
 const publicUser = (r) =>
   r && {
@@ -91,7 +92,12 @@ function list({ q, role, status, page = 1, limit = 20 }) {
   };
 }
 
-const remove = (id) => getDb().prepare('DELETE FROM users WHERE id = ?').run(id);
+function remove(id) {
+  const db = getDb();
+  const movements = db.prepare('SELECT COUNT(*) c FROM transactions WHERE user_id = ?').get(id).c;
+  if (movements > 0) throw conflict(`No se puede eliminar esta cuenta porque tiene ${movements} movimiento(s). No se modificó ningún dato.`);
+  return db.prepare('DELETE FROM users WHERE id = ?').run(id);
+}
 
 function stats() {
   const db = getDb();

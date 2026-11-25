@@ -61,16 +61,17 @@ describe('Panel de administración', () => {
     assert.equal((await adm.a.patch(`/api/admin/users/${adm.user.id}`).send({})).status, 400);
   });
 
-  test('eliminar un usuario borra en cascada sus datos', async () => {
+  test('eliminar una cuenta con movimientos se rechaza y conserva sus datos', async () => {
     const adm = await newAdmin();
     const u = await newUser();
     await u.a.post('/api/data/demo').send({});
     const db = getDb();
     assert.ok(db.prepare('SELECT COUNT(*) c FROM transactions WHERE user_id = ?').get(u.user.id).c > 0);
-    assert.equal((await adm.a.delete(`/api/admin/users/${u.user.id}`)).status, 200);
-    for (const t of ['transactions', 'members', 'categories', 'settings', 'sessions']) {
-      assert.equal(db.prepare(`SELECT COUNT(*) c FROM ${t} WHERE user_id = ?`).get(u.user.id).c, 0, t);
-    }
+    const removal = await adm.a.delete(`/api/admin/users/${u.user.id}`);
+    assert.equal(removal.status, 409);
+    assert.match(removal.body.error.message, /movimiento/);
+    assert.ok(db.prepare('SELECT COUNT(*) c FROM transactions WHERE user_id = ?').get(u.user.id).c > 0);
+    assert.equal((await u.a.get('/api/bootstrap')).status, 200);
   });
 
   test('enviar enlace de recuperación a un usuario', async () => {

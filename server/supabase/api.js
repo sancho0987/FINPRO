@@ -4,6 +4,7 @@ const { toCents, fromCents } = require('../utils/money');
 const { getPeriod, shiftPeriod, addDays, todayStr } = require('../utils/period');
 const { publicClient } = require('./client');
 const { authRequest } = require('./auth');
+const config = require('../config');
 const { validate } = require('../middleware/validate');
 const S = require('../validators/schemas');
 
@@ -137,6 +138,27 @@ async function validateReferences(req, body) {
   }
 }
 
+async function updateSupabaseTransaction(req, id, body, existing) {
+  if (existing.type !== body.type) {
+    check(await req.supabase.rpc('update_transaction', {
+      p_id: id,
+      p_type: body.type,
+      p_category_id: body.categoryId,
+      p_family_member_id: body.memberId || null,
+      p_amount_cents: toCents(body.amount),
+      p_description: body.description,
+      p_note: body.note || '',
+      p_occurred_on: body.date,
+    }), 'No se pudo cambiar el tipo del movimiento.');
+    return;
+  }
+
+  const table = existing.type === 'ingreso' ? 'incomes' : 'expenses';
+  check(await req.supabase.from(table).update({ category_id: body.categoryId, family_member_id: body.memberId || null,
+    amount_cents: toCents(body.amount), description: body.description, note: body.note || '', occurred_on: body.date })
+    .eq('household_id', req.householdId).eq('id', id), 'No se pudo actualizar el movimiento.');
+}
+
 async function categoryRows(req, cfg, periodStart) {
   const [cats, budgets, members] = await Promise.all([
     req.supabase.from('categories').select('*').eq('household_id', req.householdId).order('sort_order'),
@@ -184,7 +206,7 @@ async function summary(req, period) {
   const daily = Array.from({ length: 14 }, (_, i) => { const date = addDays(start, i); return { date, amount: fromCents(dailyMap.get(date) || 0) }; });
   return {
     period: { from: p.from, to: p.to, year: p.year, month: p.month }, budgetTotal: fromCents(budgetTotal), spent: fromCents(spent), income: fromCents(income),
-    balance: fromCents(income - spent), available: fromCents(budgetTotal - spent), pct: budgetTotal ? Math.round(spent / budgetTotal * 100) : 0,
+    balance: fromCents(income - spent), available: budgetTotal ? fromCents(budgetTotal - spent) : null, pct: budgetTotal ? Math.round(spent / budgetTotal * 100) : null,
     txCount: rows.length, antTotal: fromCents(antCents), antCount, byCategory, byMember,
     unassigned: { spent: fromCents(unassignedCents), count: unassignedCount }, daily,
   };
@@ -197,6 +219,16 @@ function csvCell(v) {
 }
 
 const failRls = (res) => res.status(403).json({ error: { code: 'FORBIDDEN', message: 'No tienes permiso para realizar esta acción.' } });
+
+async function manageHouseholdMember(req, { userId, role = null, isActive = null, remove = false }) {
+  check(await req.supabase.rpc('manage_household_member', {
+    p_household_id: req.householdId,
+    p_user_id: userId,
+    p_role: role,
+    p_is_active: isActive,
+    p_remove: remove,
+  }), 'No se pudo actualizar la membresía del hogar.');
+}
 
 async function createCategory(req, body) {
   const cfg = await settingsRow(req); const p = currentPeriod(cfg.cutoff_day);
@@ -217,7 +249,8 @@ async function bootstrap(req, res) {
     authMe(req), categoriesFor(req, p.from), membersFor(req),
     req.supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
   ]);
-  res.json({ user, settings: settingsDto(cfg), categories, members, hasTransactions: !count.error && count.count > 0, demoEnabled: false });
+  res.json({ user, settings: settingsDto(cfg), categories, members, hasTransactions: !count.error && count.count > 0, demoEnabled: false,
+    householdId: req.householdId, householdRole: req.membershipRole });
 }
 
 function makeRouterHandlers(router) {
@@ -307,8 +340,7 @@ function makeRouterHandlers(router) {
   router.put('/transactions/:id', validate('body', S.transaction), async (req, res) => {
     const b = req.valid.body; await validateReferences(req, b);
     const existing = await oneTransaction(req, req.params.id); if (!existing) throw notFound('Movimiento no encontrado.');
-    const table = existing.type === 'ingreso' ? 'incomes' : 'expenses';
-    check(await req.supabase.from(table).update({ category_id: b.categoryId, family_member_id: b.memberId || null, amount_cents: toCents(b.amount), description: b.description, note: b.note || '', occurred_on: b.date }).eq('household_id', req.householdId).eq('id', req.params.id));
+    await updateSupabaseTransaction(req, req.params.id, b, existing);
     res.json({ transaction: await oneTransaction(req, req.params.id) });
   });
   router.delete('/transactions/:id', async (req, res) => {
@@ -369,9 +401,9 @@ function makeRouterHandlers(router) {
         req.supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
         req.supabase.from('family_members').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
       ]);
-      return { id: m.user_id, name: m.profiles?.full_name || '', email: m.profiles?.email || '', role: m.role === 'member' ? 'user' : 'admin', isActive: m.is_active, createdAt: m.joined_at, txCount: tx.count || 0, memberCount: mem.count || 0 };
+      return { id: m.user_id, name: m.profiles?.full_name || '', email: m.profiles?.email || '', role: m.role === 'member' ? 'user' : 'admin', isOwner: m.role === 'owner', isActive: m.is_active, createdAt: m.joined_at, txCount: tx.count || 0, memberCount: mem.count || 0 };
     }));
-    res.json({ items, total: filtered.length, page: q.page, limit: q.limit, pages: Math.max(1, Math.ceil(filtered.length / q.limit)) });
+    res.json({ items, total: filtered.length, page: q.page, limit: q.limit, pages: Math.max(1, Math.ceil(filtered.length / q.limit)), canManageAdmins: req.membershipRole === 'owner' });
   });
   router.patch('/admin/users/:id', validate('body', S.admin.updateUser), async (req, res) => {
     if (!['owner', 'admin'].includes(req.membershipRole)) return failRls(res);
@@ -379,17 +411,20 @@ function makeRouterHandlers(router) {
     if (targetId === req.user.id && (isActive === false || role === 'user')) throw conflict('No puedes desactivar tu propia cuenta ni quitarte permisos.');
     const target = check(await req.supabase.from('household_members').select('*').eq('household_id', req.householdId).eq('user_id', targetId).maybeSingle());
     if (!target) throw notFound('Usuario no encontrado en este hogar.');
-    const update = {};
-    if (role) update.role = role === 'admin' ? (target.role === 'owner' ? 'owner' : 'admin') : 'member';
-    if (isActive !== undefined) update.is_active = isActive;
-    const updated = check(await req.supabase.from('household_members').update(update).eq('household_id', req.householdId).eq('user_id', targetId).select('*').single());
+    await manageHouseholdMember(req, {
+      userId: targetId,
+      role: role ? (role === 'admin' ? 'admin' : 'member') : null,
+      isActive: isActive ?? null,
+    });
+    const updated = check(await req.supabase.from('household_members').select('*').eq('household_id', req.householdId).eq('user_id', targetId).single());
     res.json({ user: { id: targetId, role: updated.role === 'member' ? 'user' : 'admin', isActive: updated.is_active } });
   });
   router.delete('/admin/users/:id', async (req, res) => {
     if (!['owner', 'admin'].includes(req.membershipRole)) return failRls(res);
     if (req.params.id === req.user.id) throw conflict('No puedes quitarte del hogar desde este panel.');
-    const removed = check(await req.supabase.from('household_members').delete().eq('household_id', req.householdId).eq('user_id', req.params.id).select('user_id'));
-    if (!removed.length) throw notFound('Usuario no encontrado en este hogar.');
+    const target = check(await req.supabase.from('household_members').select('user_id').eq('household_id', req.householdId).eq('user_id', req.params.id).maybeSingle());
+    if (!target) throw notFound('Usuario no encontrado en este hogar.');
+    await manageHouseholdMember(req, { userId: req.params.id, remove: true });
     res.json({ ok: true });
   });
   router.post('/admin/users/:id/send-reset', async (req, res) => {
@@ -401,4 +436,4 @@ function makeRouterHandlers(router) {
   });
 }
 
-module.exports = { makeRouterHandlers };
+module.exports = { makeRouterHandlers, updateSupabaseTransaction, manageHouseholdMember };
