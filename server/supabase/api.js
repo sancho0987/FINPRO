@@ -110,7 +110,10 @@ function isMissingTransactionPageRpc(error) {
 }
 
 function isMissingMonthlyBudgetColumn(error) {
-  return error?.code === '42703' && /monthly_budget_cents/i.test(error?.message || '');
+  // PostgREST can report a missing database column directly from PostgreSQL
+  // (42703) or from its schema cache (PGRST204), depending on the operation.
+  return (error?.code === '42703' || error?.code === 'PGRST204')
+    && /monthly_budget_cents/i.test(error?.message || '');
 }
 
 async function decorateTransactions(req, rows, antLimit) {

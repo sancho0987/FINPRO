@@ -81,7 +81,7 @@ test('Supabase permite guardar la configuración básica mientras falta la colum
               single: async () => {
                 writes.push(values);
                 return 'monthly_budget_cents' in values
-                  ? { data: null, error: { code: '42703', message: 'column households.monthly_budget_cents does not exist' } }
+                  ? { data: null, error: { code: 'PGRST204', message: "Could not find the 'monthly_budget_cents' column of 'households' in the schema cache" } }
                   : { data: { id: 'household-1', ...values }, error: null };
               },
             }),
@@ -113,7 +113,7 @@ test('Supabase informa claramente cuando se intenta guardar un presupuesto globa
         update: () => ({
           eq: () => ({
             select: () => ({
-              single: async () => ({ data: null, error: { code: '42703', message: 'column households.monthly_budget_cents does not exist' } }),
+              single: async () => ({ data: null, error: { code: 'PGRST204', message: "Could not find the 'monthly_budget_cents' column of 'households' in the schema cache" } }),
             }),
           }),
         }),
