@@ -70,6 +70,7 @@ Pruebas automáticas (base de datos SQLite en memoria y pruebas de contrato Supa
 - **Resumen:** disponible del presupuesto, barra de composición del gasto con marca de alerta, alertas (presupuesto, categorías excedidas, gastos hormiga), gasto diario, últimos movimientos.
 - **Movimientos:** crear/editar/eliminar; búsqueda, filtros (tipo, categoría, miembro, período/todo), orden, paginación, exportar CSV.
 - **Familia:** integrantes del hogar actual (CRUD) con gasto y porcentaje; gráfico de distribución. Al eliminar un integrante sus movimientos se conservan «sin asignar». Invitaciones y cambio entre hogares están aplazados.
+- **Avatares:** editor vectorial con vista previa para el perfil de la cuenta y cada integrante familiar. Guarda una configuración JSON validada por separado en `profiles.avatar` y `family_members.avatar`; las políticas RLS ya existentes siguen delimitando perfil propio y hogar. Antes de desplegar esta versión con Supabase, revisa y aplica manualmente `supabase/migrations/202611260001_family_avatars.sql`; no se ejecuta automáticamente. En SQLite local la migración `server/db/migrations/002_member_avatars.sql` se aplica al iniciar.
 - **Reportes:** evolución 6/12 meses, top categorías, tabla presupuesto vs. gasto con estado.
 - **Configuración:** nombre del hogar, moneda, **día de corte** (mes financiero), presupuesto mensual global, umbral de alerta, límite de gasto hormiga, presupuestos y categorías (CRUD con reasignación), exportar CSV/JSON, borrar todos los datos (pide contraseña). El presupuesto mensual global es opcional: si queda en 0, el resumen conserva como límite la suma de las categorías.
 - **Administración (rol admin):** lista/búsqueda de usuarios, cambiar rol, activar/desactivar, enviar enlace de recuperación, eliminar. El admin **no** puede ver los movimientos de otros usuarios. Protecciones: no auto-degradarse y siempre debe quedar un admin activo.
@@ -86,7 +87,7 @@ Pruebas automáticas (base de datos SQLite en memoria y pruebas de contrato Supa
 ## 10. Estructura
 ```
 server/  config · db (migraciones) · models · services · controllers · routes · middleware · validators · scripts
-public/  login/register/forgot/reset/app.html · css/ · js/ (api, ui, utils, store, forms, charts, pages/*)
+public/  login/register/forgot/reset/app.html · css/ · js/ (api, ui, utils, store, forms, charts, components/*, pages/*)
 tests/   pruebas automáticas
 legacy/  prototipo original (FINPRO.original.html)
 ```

@@ -1,8 +1,9 @@
 import { api } from '../api.js';
-import { html, raw, setHtml, $, $$, fmtDate, initials, debounce } from '../utils.js';
+import { html, raw, setHtml, $, $$, fmtDate, debounce } from '../utils.js';
 import { icon } from '../icons.js';
 import { app } from '../store.js';
 import { toast, confirmDialog } from '../ui.js';
+import { avatarMarkup } from '../components/avatar.js';
 
 const F = { q: '', role: '', status: '', page: 1 };
 
@@ -26,7 +27,7 @@ export async function render({ root, isCurrent, signal }) {
         <select class="select" id="u-status" aria-label="Estado">${opt('', F.status, 'Todos los estados')}${opt('active', F.status, 'Activos')}${opt('inactive', F.status, 'Desactivados')}</select></form>
       ${list.items.length ? html`<div class="table-wrap"><table class="table stack-m"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Registro</th><th class="r">Movimientos</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>
         ${list.items.map((u) => { const me = u.id === app.user.id; const protectedRole = me || u.isOwner || (!canManageAdmins && u.role === 'admin'); const canManageTarget = !me && !u.isOwner && (canManageAdmins || u.role === 'user'); return html`<tr>
-          <td class="full"><div class="cellflex"><span class="avatar" style="width:34px;height:34px;font-size:12px">${initials(u.name)}</span><div style="min-width:0"><div>${u.name}${me ? html` <span class="pill ok">Tú</span>` : ''}</div><div class="faint" style="font-size:12px;word-break:break-all">${u.email}</div></div></div></td>
+          <td class="full"><div class="cellflex">${avatarMarkup(u.avatar, { size: 36, label: `Avatar de ${u.name}` })}<div style="min-width:0"><div>${u.name}${me ? html` <span class="pill ok">Tú</span>` : ''}</div><div class="faint" style="font-size:12px;word-break:break-all">${u.email}</div></div></div></td>
           <td data-label="Rol">${u.isOwner ? html`<span class="pill info">Titular</span>` : protectedRole ? html`<span class="pill">${u.role === 'admin' ? 'Administrador' : 'Usuario'}</span>` : html`<select class="select inline-select" data-role="${u.id}" aria-label="Rol de ${u.name}">${opt('user', u.role, 'Usuario')}${canManageAdmins ? opt('admin', u.role, 'Administrador') : ''}</select>`}</td>
           <td data-label="Estado"><span class="pill ${u.isActive ? 'ok' : 'bad'}">${u.isActive ? 'Activo' : 'Desactivado'}</span></td>
           <td class="sub" data-label="Registro">${fmtDate(u.createdAt.slice(0, 10), { day: '2-digit', month: 'short', year: 'numeric' })}</td>

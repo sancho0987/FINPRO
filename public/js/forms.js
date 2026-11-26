@@ -2,6 +2,7 @@
 import { api } from './api.js';
 import { html, raw, $, $$, todayStr, money } from './utils.js';
 import { icon } from './icons.js';
+import { avatarMarkup } from './components/avatar.js';
 import { app, notifyChange, incomeCategory } from './store.js';
 import { openModal, modalHead, toast, setLoading, showFieldErrors, clearFieldErrors, setFormError, runRules, validators as v, confirmDialog, liveValidate } from './ui.js';
 
@@ -54,6 +55,7 @@ export function openTxModal(tx = null, defaults = {}) {
         ${field('Categoría', 'tx-cat', html`<select class="select" id="tx-cat" name="categoryId">${cats.map((c) => html`<option value="${c.id}" ${raw(c.id === initCat ? 'selected' : '')}>${c.emoji} ${c.name}</option>`)}</select>`)}
         ${field('Miembro', 'tx-mem', html`<select class="select" id="tx-mem" name="memberId"><option value="">Sin asignar</option>${app.members.map((mm) => html`<option value="${mm.id}" ${raw(mm.id === tx?.memberId ? 'selected' : '')}>${mm.emoji} ${mm.name}</option>`)}</select>`)}
       </div>
+      <div class="tx-member-preview" id="tx-member-preview" aria-live="polite"></div>
       ${field('Fecha', 'tx-date', html`<input class="input" id="tx-date" name="date" type="date" min="1990-01-01" max="2100-12-31" value="${tx?.date || defaults.date || todayStr()}" required>`)}
       ${field('Nota (opcional)', 'tx-note', html`<input class="input" id="tx-note" name="note" maxlength="300" placeholder="Detalles adicionales" value="${tx?.note ?? ''}">`)}
       <div class="modal-actions">
@@ -63,6 +65,14 @@ export function openTxModal(tx = null, defaults = {}) {
       </div>
     </form>`, { label: editing ? 'Editar movimiento' : 'Nuevo movimiento' });
   const form = $('#tx-form', m.el);
+  const memberSelect = form.elements.memberId;
+  const memberPreview = $('#tx-member-preview', m.el);
+  const updateMemberPreview = () => {
+    const member = app.members.find((item) => String(item.id) === memberSelect.value);
+    memberPreview.innerHTML = member ? html`<span>Responsable</span>${avatarMarkup(member.avatar, { size: 28, label: `Avatar de ${member.name}`, background: member.color })}<b>${member.name}</b>` : html`<span>Movimiento sin integrante asignado</span>`;
+  };
+  memberSelect.addEventListener('change', updateMemberPreview);
+  updateMemberPreview();
   let catTouched = editing;
   form.elements.categoryId.addEventListener('change', () => { catTouched = true; });
   $$('input[name=type]', form).forEach((r) => r.addEventListener('change', () => {

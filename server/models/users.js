@@ -11,6 +11,7 @@ const publicUser = (r) =>
     isActive: !!r.is_active,
     createdAt: r.created_at,
     lastLoginAt: r.last_login_at,
+    avatar: (() => { try { return JSON.parse(r.avatar_json || '{}'); } catch { return {}; } })(),
   };
 
 const findByEmail = (email) => getDb().prepare('SELECT * FROM users WHERE email = ?').get(email);
@@ -24,13 +25,13 @@ function create({ name, email, passwordHash, role = 'user' }) {
 }
 
 function update(id, fields) {
-  const map = { name: 'name', email: 'email', passwordHash: 'password_hash', role: 'role', isActive: 'is_active' };
+  const map = { name: 'name', email: 'email', passwordHash: 'password_hash', role: 'role', isActive: 'is_active', avatar: 'avatar_json' };
   const sets = [];
   const vals = [];
   for (const [k, col] of Object.entries(map)) {
     if (fields[k] !== undefined) {
       sets.push(`${col} = ?`);
-      vals.push(k === 'isActive' ? (fields[k] ? 1 : 0) : fields[k]);
+      vals.push(k === 'isActive' ? (fields[k] ? 1 : 0) : k === 'avatar' ? JSON.stringify(fields[k]) : fields[k]);
     }
   }
   if (!sets.length) return findById(id);

@@ -16,6 +16,11 @@ exports.update = (req, res) => {
   if (!members.find(req.user.id, mid)) throw notFound('Miembro no encontrado.');
   res.json({ member: members.update(req.user.id, mid, req.valid.body) });
 };
+exports.updateAvatar = (req, res) => {
+  const mid = pid(req);
+  if (!members.find(req.user.id, mid)) throw notFound('Miembro no encontrado.');
+  res.json({ member: members.updateAvatar(req.user.id, mid, req.valid.body) });
+};
 exports.remove = (req, res) => {
   const mid = pid(req);
   if (!members.find(req.user.id, mid)) throw notFound('Miembro no encontrado.');

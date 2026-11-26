@@ -1,12 +1,13 @@
 import { html, raw, money, fmtDate } from '../utils.js';
+import { avatarMarkup } from './avatar.js';
 
 export const antPill = html`<span class="pill" title="Gasto hormiga: compra pequeña o de una categoría hormiga">🐜 hormiga</span>`;
 
 export function txRow(t) {
-  const sub = [t.category.name, t.member ? `${t.member.emoji} ${t.member.name}` : null, fmtDate(t.date)].filter(Boolean).join(' · ');
+  const sub = [t.category.name, t.member ? t.member.name : null, fmtDate(t.date)].filter(Boolean).join(' · ');
   return html`<button class="tx" type="button" data-edit-tx="${t.id}" aria-label="Editar ${t.description}">
     <span class="tx-ico" style="--c:${t.category.color}">${t.category.emoji}</span>
-    <span class="tx-body"><span class="tx-title"><span class="tx-text">${t.description}</span>${t.isAnt ? antPill : ''}</span><span class="tx-sub">${sub}</span></span>
+    <span class="tx-body"><span class="tx-title"><span class="tx-text">${t.description}</span>${t.isAnt ? antPill : ''}</span><span class="tx-sub">${t.member ? avatarMarkup(t.member.avatar, { size: 20, label: `Avatar de ${t.member.name}`, background: t.member.color }) : ''}${sub}</span></span>
     <span class="amt ${t.type === 'ingreso' ? 'pos' : 'neg'}">${t.type === 'ingreso' ? '+' : '−'}${money(t.amount)}</span>
   </button>`;
 }
