@@ -28,7 +28,23 @@ async function settingsRow(req) {
   return row;
 }
 
-const settingsDto = (r) => ({ householdName: r.name, currency: r.currency, cutoffDay: r.cutoff_day, alertPct: r.alert_pct, antLimit: fromCents(r.ant_limit_cents) });
+const settingsDto = (r) => ({
+  householdName: r.name,
+  currency: r.currency,
+  cutoffDay: r.cutoff_day,
+  alertPct: r.alert_pct,
+  antLimit: fromCents(r.ant_limit_cents),
+  monthlyBudget: fromCents(Number(r.monthly_budget_cents) || 0),
+});
+
+function budgetTotals(cfg, categoryBudgetCents) {
+  const monthlyBudgetCents = Number(cfg.monthly_budget_cents) || 0;
+  return {
+    monthlyBudgetCents,
+    categoryBudgetCents,
+    budgetTotalCents: monthlyBudgetCents > 0 ? monthlyBudgetCents : categoryBudgetCents,
+  };
+}
 
 function currentPeriod(cutoffDay, date = todayStr()) {
   const [year, month, day] = date.split('-').map(Number);
@@ -195,7 +211,8 @@ async function summary(req, period) {
       if (c?.isAnt || (cfg.ant_limit_cents > 0 && t.amount_cents < cfg.ant_limit_cents)) { antCents += t.amount_cents; antCount++; }
     }
   }
-  const budgetTotal = [...catMap.values()].reduce((s, c) => s + c.budgetCents, 0);
+  const categoryBudgetTotal = [...catMap.values()].reduce((s, c) => s + c.budgetCents, 0);
+  const { monthlyBudgetCents, budgetTotalCents } = budgetTotals(cfg, categoryBudgetTotal);
   const byCategory = [...catMap.values()].map((c) => ({ id: c.id, name: c.name, emoji: c.emoji, color: c.color, isAnt: c.isAnt,
     budget: fromCents(c.budgetCents), spent: fromCents(c.spent), income: fromCents(c.income), count: c.count }));
   const byMember = [...memMap.values()].map((m) => ({ ...m, spent: fromCents(m.spent) }));
@@ -205,8 +222,8 @@ async function summary(req, period) {
   for (const t of rows) if (t.type === 'gasto' && t.date >= start && t.date <= end) dailyMap.set(t.date, (dailyMap.get(t.date) || 0) + t.amount_cents);
   const daily = Array.from({ length: 14 }, (_, i) => { const date = addDays(start, i); return { date, amount: fromCents(dailyMap.get(date) || 0) }; });
   return {
-    period: { from: p.from, to: p.to, year: p.year, month: p.month }, budgetTotal: fromCents(budgetTotal), spent: fromCents(spent), income: fromCents(income),
-    balance: fromCents(income - spent), available: budgetTotal ? fromCents(budgetTotal - spent) : null, pct: budgetTotal ? Math.round(spent / budgetTotal * 100) : null,
+    period: { from: p.from, to: p.to, year: p.year, month: p.month }, budgetTotal: fromCents(budgetTotalCents), monthlyBudget: fromCents(monthlyBudgetCents), categoryBudgetTotal: fromCents(categoryBudgetTotal), spent: fromCents(spent), income: fromCents(income),
+    balance: fromCents(income - spent), available: budgetTotalCents ? fromCents(budgetTotalCents - spent) : null, pct: budgetTotalCents ? Math.round(spent / budgetTotalCents * 100) : null,
     txCount: rows.length, antTotal: fromCents(antCents), antCount, byCategory, byMember,
     unassigned: { spent: fromCents(unassignedCents), count: unassignedCount }, daily,
   };
@@ -259,7 +276,9 @@ function makeRouterHandlers(router) {
   router.get('/settings', async (req, res) => res.json({ settings: settingsDto(await settingsRow(req)) }));
   router.put('/settings', validate('body', S.settings), async (req, res) => {
     const s = req.valid.body;
-    const updated = await req.supabase.from('households').update({ name: s.householdName, currency: s.currency, cutoff_day: s.cutoffDay, alert_pct: s.alertPct, ant_limit_cents: toCents(s.antLimit) }).eq('id', req.householdId).select('*').single();
+    const changes = { name: s.householdName, currency: s.currency, cutoff_day: s.cutoffDay, alert_pct: s.alertPct, ant_limit_cents: toCents(s.antLimit) };
+    if (s.monthlyBudget !== undefined) changes.monthly_budget_cents = toCents(s.monthlyBudget);
+    const updated = await req.supabase.from('households').update(changes).eq('id', req.householdId).select('*').single();
     res.json({ settings: settingsDto(check(updated, 'No se pudo actualizar la configuración.')) });
   });
 
@@ -436,4 +455,4 @@ function makeRouterHandlers(router) {
   });
 }
 
-module.exports = { makeRouterHandlers, updateSupabaseTransaction, manageHouseholdMember };
+module.exports = { makeRouterHandlers, updateSupabaseTransaction, manageHouseholdMember, settingsDto, budgetTotals };

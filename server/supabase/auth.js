@@ -1,7 +1,7 @@
 'use strict';
 const config = require('../config');
 const { setSessionCookies, clearSessionCookies } = require('./session');
-const { AppError, badRequest, unauthorized } = require('../utils/errors');
+const { AppError, badRequest, forbidden, unauthorized } = require('../utils/errors');
 
 async function authRequest(path, { method = 'POST', body, accessToken } = {}) {
   const headers = { apikey: config.supabaseAnonKey, 'Content-Type': 'application/json' };
@@ -45,6 +45,7 @@ const setAuthSession = (res, data) => {
 };
 
 async function register(req, res) {
+  if (!config.allowRegistration) throw forbidden('El registro de nuevas cuentas está deshabilitado.');
   const { name, email, password } = req.valid.body;
   const redirectTo = `${config.appUrl}/app`;
   const data = await authRequest(`/signup?redirect_to=${encodeURIComponent(redirectTo)}`, { body: { email, password, data: { full_name: name } } });
