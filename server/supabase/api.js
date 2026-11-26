@@ -95,6 +95,24 @@ async function readTransactions(req, { from, to, type, categoryId, memberId, q, 
     && (maxAmount === undefined || t.amount_cents <= toCents(Number(maxAmount))));
 }
 
+function sortTransactions(rows, sort, dir) {
+  const sign = dir === 'asc' ? 1 : -1;
+  return rows.sort((a, b) => {
+    const av = sort === 'amount' ? a.amount_cents : sort === 'description' ? a.description.toLocaleLowerCase() : a.date;
+    const bv = sort === 'amount' ? b.amount_cents : sort === 'description' ? b.description.toLocaleLowerCase() : b.date;
+    return (av < bv ? -1 : av > bv ? 1 : 0) * sign || String(b.id).localeCompare(String(a.id));
+  });
+}
+
+function isMissingTransactionPageRpc(error) {
+  return (error?.code === 'PGRST202' || error?.code === '42883')
+    && /get_transactions_page/i.test(error?.message || '');
+}
+
+function isMissingMonthlyBudgetColumn(error) {
+  return error?.code === '42703' && /monthly_budget_cents/i.test(error?.message || '');
+}
+
 async function decorateTransactions(req, rows, antLimit) {
   const categoryIds = [...new Set(rows.map((r) => r.category_id))];
   const memberIds = [...new Set(rows.map((r) => r.family_member_id).filter(Boolean))];
@@ -118,12 +136,30 @@ async function decorateTransactions(req, rows, antLimit) {
   });
 }
 
+async function fallbackPageTransactions(req, cfg, filters, page, limit) {
+  const rows = await readTransactions(req, filters);
+  const totals = rows.reduce((acc, row) => {
+    acc[row.type] += row.amount_cents;
+    return acc;
+  }, { gasto: 0, ingreso: 0 });
+  const ordered = sortTransactions(rows, filters.sort, filters.dir);
+  const items = await decorateTransactions(req, ordered.slice((page - 1) * limit, page * limit), cfg.ant_limit_cents);
+  return {
+    items,
+    total: rows.length,
+    page,
+    limit,
+    pages: Math.max(1, Math.ceil(rows.length / limit)),
+    totals: { income: fromCents(totals.ingreso), expense: fromCents(totals.gasto) },
+  };
+}
+
 async function pageTransactions(req, filters = {}) {
   const cfg = await settingsRow(req);
   const page = Number(filters.page) || 1;
   const limit = Number(filters.limit) || 20;
   const memberId = filters.memberId || null;
-  const result = check(await req.supabase.rpc('get_transactions_page', {
+  const rpcResult = await req.supabase.rpc('get_transactions_page', {
     p_household_id: req.householdId,
     p_from: filters.from || null,
     p_to: filters.to || null,
@@ -138,7 +174,14 @@ async function pageTransactions(req, filters = {}) {
     p_desc: filters.dir !== 'asc',
     p_limit: limit,
     p_offset: (page - 1) * limit,
-  }), 'No se pudieron cargar los movimientos.');
+  });
+  // Durante un despliegue escalonado el backend puede actualizarse antes que la
+  // migración de la RPC. No bloqueamos toda la aplicación: conservamos el mismo
+  // contrato y ejecutamos la implementación compatible hasta que se publique.
+  if (isMissingTransactionPageRpc(rpcResult.error)) {
+    return fallbackPageTransactions(req, cfg, filters, page, limit);
+  }
+  const result = check(rpcResult, 'No se pudieron cargar los movimientos.');
   const total = Number(result?.total) || 0;
   const items = await decorateTransactions(req, result?.items || [], cfg.ant_limit_cents);
   return {
@@ -295,7 +338,17 @@ function makeRouterHandlers(router) {
     const s = req.valid.body;
     const changes = { name: s.householdName, currency: s.currency, cutoff_day: s.cutoffDay, alert_pct: s.alertPct, ant_limit_cents: toCents(s.antLimit) };
     if (s.monthlyBudget !== undefined) changes.monthly_budget_cents = toCents(s.monthlyBudget);
-    const updated = await req.supabase.from('households').update(changes).eq('id', req.householdId).select('*').single();
+    let updated = await req.supabase.from('households').update(changes).eq('id', req.householdId).select('*').single();
+    if (isMissingMonthlyBudgetColumn(updated.error)) {
+      if (s.monthlyBudget > 0) {
+        throw new AppError(503, 'DATABASE_MIGRATION_REQUIRED', 'El presupuesto mensual global requiere aplicar la migración pendiente de la base de datos.');
+      }
+      // Clientes actuales envían 0 incluso si el proyecto aún no tiene la
+      // columna aditiva. Permitimos guardar el resto de configuración sin
+      // ocultar el requisito para presupuestos globales distintos de cero.
+      delete changes.monthly_budget_cents;
+      updated = await req.supabase.from('households').update(changes).eq('id', req.householdId).select('*').single();
+    }
     res.json({ settings: settingsDto(check(updated, 'No se pudo actualizar la configuración.')) });
   });
 

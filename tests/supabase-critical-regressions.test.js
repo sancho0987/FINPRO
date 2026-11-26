@@ -67,6 +67,71 @@ test('Supabase guarda y expone el presupuesto mensual global sin cambiar el cont
   });
 });
 
+test('Supabase permite guardar la configuración básica mientras falta la columna mensual', async () => {
+  const app = express();
+  const writes = [];
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    req.householdId = 'household-1';
+    req.supabase = {
+      from: () => ({
+        update: (values) => ({
+          eq: () => ({
+            select: () => ({
+              single: async () => {
+                writes.push(values);
+                return 'monthly_budget_cents' in values
+                  ? { data: null, error: { code: '42703', message: 'column households.monthly_budget_cents does not exist' } }
+                  : { data: { id: 'household-1', ...values }, error: null };
+              },
+            }),
+          }),
+        }),
+      }),
+    };
+    next();
+  });
+  makeRouterHandlers(app);
+
+  const res = await request(app).put('/settings').send({
+    householdName: 'Casa', currency: 'COP', cutoffDay: 1, alertPct: 80, antLimit: 30000, monthlyBudget: 0,
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(writes.length, 2);
+  assert.equal('monthly_budget_cents' in writes[1], false);
+  assert.equal(res.body.settings.monthlyBudget, 0);
+});
+
+test('Supabase informa claramente cuando se intenta guardar un presupuesto global sin su migración', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    req.householdId = 'household-1';
+    req.supabase = {
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: async () => ({ data: null, error: { code: '42703', message: 'column households.monthly_budget_cents does not exist' } }),
+            }),
+          }),
+        }),
+      }),
+    };
+    next();
+  });
+  makeRouterHandlers(app);
+  app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: { code: err.code, message: err.message } }));
+
+  const res = await request(app).put('/settings').send({
+    householdName: 'Casa', currency: 'COP', cutoffDay: 1, alertPct: 80, antLimit: 30000, monthlyBudget: 1,
+  });
+
+  assert.equal(res.status, 503);
+  assert.equal(res.body.error.code, 'DATABASE_MIGRATION_REQUIRED');
+});
+
 test('Supabase usa el presupuesto global cuando existe y conserva el total por categorías como fallback', () => {
   assert.deepEqual(budgetTotals({ monthly_budget_cents: 0 }, 80000000), {
     monthlyBudgetCents: 0, categoryBudgetCents: 80000000, budgetTotalCents: 80000000,
@@ -110,6 +175,37 @@ test('La lista Supabase delega filtros, orden, paginación y totales a la RPC de
   });
   assert.deepEqual(page, {
     items: [], total: 42, page: 3, limit: 15, pages: 3, totals: { income: 5000, expense: 1250 },
+  });
+});
+
+test('La lista Supabase conserva la carga cuando la migración de la RPC aún no se ha publicado', async () => {
+  let transactionReads = 0;
+  const settingsQuery = {
+    select: () => ({ eq: () => ({ single: async () => ({ data: {
+      name: 'Casa', currency: 'COP', cutoff_day: 1, alert_pct: 80, ant_limit_cents: 0, monthly_budget_cents: 0,
+    }, error: null }) }) }),
+  };
+  const transactionQuery = {
+    eq() { return this; }, order() { return this; }, range() { return this; },
+    then(resolve, reject) { return Promise.resolve({ data: [], error: null }).then(resolve, reject); },
+  };
+  const req = {
+    householdId: 'household-1',
+    supabase: {
+      rpc: async () => ({ error: { code: 'PGRST202', message: 'Could not find the function public.get_transactions_page in the schema cache' } }),
+      from: (table) => {
+        if (table === 'households') return settingsQuery;
+        if (table === 'transactions') { transactionReads++; return { select: () => transactionQuery }; }
+        throw new Error(`Consulta no esperada: ${table}`);
+      },
+    },
+  };
+
+  const page = await pageTransactions(req, { page: 1, limit: 20, sort: 'date', dir: 'desc' });
+
+  assert.equal(transactionReads, 1);
+  assert.deepEqual(page, {
+    items: [], total: 0, page: 1, limit: 20, pages: 1, totals: { income: 0, expense: 0 },
   });
 });
 
