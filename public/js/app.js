@@ -19,6 +19,7 @@ const ROUTES = {
 
 let current = 'dashboard';
 let renderId = 0;
+let renderController = null;
 const view = $('#view');
 
 setUnauthorizedHandler(() => { location.href = '/login.html?expired=1'; });
@@ -59,6 +60,9 @@ const routeFromHash = () => {
 };
 
 async function render({ keepScroll = false } = {}) {
+  renderController?.abort();
+  const controller = new AbortController();
+  renderController = controller;
   const id = ++renderId;
   const scroll = window.scrollY;
   current = routeFromHash();
@@ -67,17 +71,20 @@ async function render({ keepScroll = false } = {}) {
   destroyAll();
   const root = document.createElement('div');
   view.replaceChildren(root);
-  root.innerHTML = '<div class="stack"><div class="skeleton" style="height:150px"></div><div class="skeleton" style="height:260px"></div></div>';
+  view.setAttribute('aria-busy', 'true');
+  root.innerHTML = '<div class="stack" role="status" aria-label="Cargando sección"><div class="skeleton" style="height:150px"></div><div class="skeleton" style="height:260px"></div></div>';
   try {
     const mod = await ROUTES[current].load();
     if (id !== renderId) return;
     root.innerHTML = '';
-    await mod.render({ root, isCurrent: () => id === renderId });
+    await mod.render({ root, isCurrent: () => id === renderId, signal: controller.signal });
     if (keepScroll) window.scrollTo(0, scroll); else if (!keepScroll) { window.scrollTo(0, 0); view.focus({ preventScroll: true }); }
   } catch (e) {
-    if (id !== renderId) return;
+    if (id !== renderId || e?.name === 'AbortError') return;
     root.innerHTML = '';
     setHtml(root, html`<div class="panel"><div class="empty"><div class="em">⚠️</div><h3>No pudimos cargar esta sección</h3><p>${e.message || 'Ocurrió un error inesperado.'}</p><button class="btn btn-primary" type="button" data-action="reload">Reintentar</button></div></div>`);
+  } finally {
+    if (id === renderId) view.removeAttribute('aria-busy');
   }
 }
 

@@ -325,7 +325,7 @@ function makeRouterHandlers(router) {
     let target = null;
     if (used) {
       target = req.query.reassignTo;
-      if (!target || target === id) throw conflict(`Esta categoría tiene ${used} movimiento(s). Elige otra categoría a la cual moverlos.`);
+      if (!target || target === id) throw new AppError(409, 'CATEGORY_IN_USE', `Esta categoría tiene ${used} movimiento(s). Elige otra categoría a la cual moverlos.`);
       const found = check(await req.supabase.from('categories').select('id').eq('household_id', req.householdId).eq('id', target).maybeSingle());
       if (!found) throw badRequest('La categoría de destino no existe.');
       for (const table of ['incomes', 'expenses']) check(await req.supabase.from(table).update({ category_id: target }).eq('household_id', req.householdId).eq('category_id', id));

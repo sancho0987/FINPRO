@@ -4,17 +4,18 @@ import { icon } from '../icons.js';
 import { app } from '../store.js';
 import { openTxModal, deleteTx } from '../forms.js';
 import { antPill } from '../components/tx.js';
+import { toast } from '../ui.js';
 
 // Los filtros se conservan al cambiar de sección o recargar datos
 const F = { q: '', type: '', categoryId: '', memberId: '', scope: 'period', sort: 'date', dir: 'desc', page: 1 };
 
-export async function render({ root, isCurrent }) {
+export async function render({ root, isCurrent, signal }) {
   const { from, to } = periodRange(app.period.year, app.period.month, app.settings.cutoffDay);
   const params = { q: F.q, type: F.type, categoryId: F.categoryId, memberId: F.memberId, sort: F.sort, dir: F.dir, page: F.page, limit: 15,
     ...(F.scope === 'period' ? { from, to } : {}) };
-  const data = await api.get('/api/transactions', params);
+  const data = await api.get('/api/transactions', params, { signal });
   if (!isCurrent()) return;
-  if (F.page > data.pages) { F.page = data.pages; return render({ root, isCurrent }); }
+  if (F.page > data.pages) { F.page = data.pages; return render({ root, isCurrent, signal }); }
 
   const opt = (v, cur, label) => html`<option value="${v}" ${raw(String(cur) === String(v) ? 'selected' : '')}>${label}</option>`;
   const sortBtn = (key, label) => html`<button type="button" class="sort-btn" data-sort="${key}" aria-label="Ordenar por ${label}">${label}${F.sort === key ? raw(icon(F.dir === 'asc' ? 'up' : 'down')) : ''}</button>`;
@@ -52,9 +53,14 @@ export async function render({ root, isCurrent }) {
         ${hasFilters ? html`<button class="btn btn-ghost" type="button" id="clear2">Limpiar filtros</button>` : html`<button class="btn btn-primary" type="button" data-add>${raw(icon('plus'))}Nuevo movimiento</button>`}</div>`}
     </section>`);
 
-  const redo = () => render({ root, isCurrent });
-  const setF = (patch) => { Object.assign(F, patch, { page: patch.page ?? 1 }); redo(); };
-  $('#f-q', root).addEventListener('input', debounce((e) => { F.q = e.target.value.trim(); F.page = 1; redo().then(() => { const el = $('#f-q', root); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }); }, 350));
+  const redo = () => render({ root, isCurrent, signal });
+  const reportRefreshError = (error) => { if (error?.name !== 'AbortError') toast(error.message || 'No se pudieron actualizar los movimientos.', 'error'); };
+  const refresh = () => { void redo().catch(reportRefreshError); };
+  const setF = (patch) => { Object.assign(F, patch, { page: patch.page ?? 1 }); refresh(); };
+  $('#f-q', root).addEventListener('input', debounce((e) => {
+    F.q = e.target.value.trim(); F.page = 1;
+    void redo().then(() => { const el = $('#f-q', root); el?.focus(); el?.setSelectionRange(el.value.length, el.value.length); }).catch(reportRefreshError);
+  }, 350));
   $('#f-type', root).addEventListener('change', (e) => setF({ type: e.target.value }));
   $('#f-cat', root).addEventListener('change', (e) => setF({ categoryId: e.target.value }));
   $('#f-mem', root).addEventListener('change', (e) => setF({ memberId: e.target.value }));

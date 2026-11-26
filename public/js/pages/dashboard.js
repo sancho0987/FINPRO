@@ -18,11 +18,11 @@ function countUp(el, to, duration = 700) {
   requestAnimationFrame(step);
 }
 
-export async function render({ root, isCurrent }) {
+export async function render({ root, isCurrent, signal }) {
   const cfg = app.settings;
   const [s, recent] = await Promise.all([
-    api.get('/api/reports/summary', { year: app.period.year, month: app.period.month, today: todayStr() }),
-    api.get('/api/transactions', { from: periodFrom(app), to: periodTo(app), limit: 8 }),
+    api.get('/api/reports/summary', { year: app.period.year, month: app.period.month, today: todayStr() }, { signal }),
+    api.get('/api/transactions', { from: periodFrom(app), to: periodTo(app), limit: 8 }, { signal }),
   ]);
   if (!isCurrent()) return;
   // los límites del período vienen del servidor

@@ -6,10 +6,10 @@ import { toast, confirmDialog } from '../ui.js';
 
 const F = { q: '', role: '', status: '', page: 1 };
 
-export async function render({ root, isCurrent }) {
+export async function render({ root, isCurrent, signal }) {
   const [stats, list] = await Promise.all([
-    api.get('/api/admin/stats'),
-    api.get('/api/admin/users', { q: F.q, role: F.role, status: F.status, page: F.page, limit: 15 }),
+    api.get('/api/admin/stats', undefined, { signal }),
+    api.get('/api/admin/users', { q: F.q, role: F.role, status: F.status, page: F.page, limit: 15 }, { signal }),
   ]);
   if (!isCurrent()) return;
   const st = stats.stats;
@@ -42,33 +42,36 @@ export async function render({ root, isCurrent }) {
       : html`<div class="empty"><div class="em">🔎</div><h3>Sin resultados</h3><p>No hay usuarios con esos filtros.</p></div>`}
     </section>`);
 
-  const redo = () => render({ root, isCurrent });
+  const redo = () => render({ root, isCurrent, signal });
+  const reportRefreshError = (error) => { if (error?.name !== 'AbortError') toast(error.message || 'No se pudo actualizar la lista de usuarios.', 'error'); };
+  const refresh = () => { void redo().catch(reportRefreshError); };
   $('#uf', root).addEventListener('submit', (e) => e.preventDefault());
-  $('#u-q', root).addEventListener('input', debounce((e) => { F.q = e.target.value.trim(); F.page = 1; redo().then(() => { const el = $('#u-q', root); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }); }, 350));
-  $('#u-role', root).addEventListener('change', (e) => { F.role = e.target.value; F.page = 1; redo(); });
-  $('#u-status', root).addEventListener('change', (e) => { F.status = e.target.value; F.page = 1; redo(); });
+  $('#u-q', root).addEventListener('input', debounce((e) => {
+    F.q = e.target.value.trim(); F.page = 1;
+    void redo().then(() => { const el = $('#u-q', root); el?.focus(); el?.setSelectionRange(el.value.length, el.value.length); }).catch(reportRefreshError);
+  }, 350));
+  $('#u-role', root).addEventListener('change', (e) => { F.role = e.target.value; F.page = 1; refresh(); });
+  $('#u-status', root).addEventListener('change', (e) => { F.status = e.target.value; F.page = 1; refresh(); });
   root.__list = list; root.__redo = redo;
   if (root.__bound) return;
   root.__bound = true;
   const byId = (id) => root.__list.items.find((u) => String(u.id) === String(id));
 
   root.addEventListener('change', async (e) => {
-    const redo = root.__redo;
     const sel = e.target.closest('[data-role]'); if (!sel) return;
     const u = byId(sel.dataset.role);
-    if (!(await confirmDialog({ title: 'Cambiar rol', message: `${u.name} pasará a ser ${sel.value === 'admin' ? 'administrador' : 'usuario'}.`, confirmText: 'Cambiar rol' }))) return redo();
+    if (!(await confirmDialog({ title: 'Cambiar rol', message: `${u.name} pasará a ser ${sel.value === 'admin' ? 'administrador' : 'usuario'}.`, confirmText: 'Cambiar rol' }))) return refresh();
     try { await api.patch(`/api/admin/users/${u.id}`, { role: sel.value }); toast('Rol actualizado'); } catch (ex) { toast(ex.message, 'error'); }
-    redo();
+    refresh();
   });
   root.addEventListener('click', async (e) => {
-    const redo = root.__redo;
-    const pg = e.target.closest('[data-page]'); if (pg && !pg.disabled) { F.page = Number(pg.dataset.page); return redo(); }
+    const pg = e.target.closest('[data-page]'); if (pg && !pg.disabled) { F.page = Number(pg.dataset.page); return refresh(); }
     const tg = e.target.closest('[data-toggle]');
     if (tg) {
       const u = byId(tg.dataset.toggle);
       if (u.isActive && !(await confirmDialog({ title: 'Desactivar cuenta', message: `${u.name} no podrá iniciar sesión y se cerrarán sus sesiones abiertas. Sus datos se conservan.`, confirmText: 'Desactivar', danger: true }))) return;
       try { await api.patch(`/api/admin/users/${u.id}`, { isActive: !u.isActive }); toast(u.isActive ? 'Cuenta desactivada' : 'Cuenta activada'); } catch (ex) { toast(ex.message, 'error'); }
-      return redo();
+      return refresh();
     }
     const rs = e.target.closest('[data-reset]');
     if (rs) { const u = byId(rs.dataset.reset); try { const r = await api.post(`/api/admin/users/${u.id}/send-reset`); toast(r.message); } catch (ex) { toast(ex.message, 'error'); } return; }
@@ -77,7 +80,7 @@ export async function render({ root, isCurrent }) {
       const u = byId(dl.dataset.del);
       if (!(await confirmDialog({ title: 'Eliminar usuario', message: `Se eliminará la cuenta de ${u.name} (${u.email}) y TODOS sus datos (${u.txCount} movimientos). No se puede deshacer.`, confirmText: 'Eliminar usuario', danger: true }))) return;
       try { await api.del(`/api/admin/users/${u.id}`); toast('Usuario eliminado'); } catch (ex) { toast(ex.message, 'error'); }
-      redo();
+      refresh();
     }
   });
 }

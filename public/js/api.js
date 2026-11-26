@@ -6,12 +6,15 @@ export class ApiError extends Error {
 let onUnauthorized = () => { window.location.href = '/login.html'; };
 export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 
-async function request(method, url, body, { silent401 = false } = {}) {
-  const opts = { method, credentials: 'same-origin', headers: { 'X-Requested-With': 'FINPRO' } };
+async function request(method, url, body, { silent401 = false, signal } = {}) {
+  const opts = { method, credentials: 'same-origin', headers: { 'X-Requested-With': 'FINPRO' }, ...(signal ? { signal } : {}) };
   if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
   let res;
   try { res = await fetch(url, opts); }
-  catch { throw new ApiError(0, 'NETWORK', 'No se pudo conectar con el servidor. Revisa tu conexión.'); }
+  catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    throw new ApiError(0, 'NETWORK', 'No se pudo conectar con el servidor. Revisa tu conexión.');
+  }
 
   const ct = res.headers.get('content-type') || '';
   const data = ct.includes('application/json') ? await res.json().catch(() => null) : null;

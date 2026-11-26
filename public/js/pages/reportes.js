@@ -4,14 +4,15 @@ import { icon } from '../icons.js';
 import { app } from '../store.js';
 import { draw, axes, tooltip } from '../charts.js';
 import { budgetStatus } from '../components/tx.js';
+import { toast } from '../ui.js';
 
 let months = 6;
 
-export async function render({ root, isCurrent }) {
+export async function render({ root, isCurrent, signal }) {
   const cfg = app.settings;
   const [s, m] = await Promise.all([
-    api.get('/api/reports/summary', { year: app.period.year, month: app.period.month, today: todayStr() }),
-    api.get('/api/reports/monthly', { year: app.period.year, month: app.period.month, months }),
+    api.get('/api/reports/summary', { year: app.period.year, month: app.period.month, today: todayStr() }, { signal }),
+    api.get('/api/reports/monthly', { year: app.period.year, month: app.period.month, months }, { signal }),
   ]);
   if (!isCurrent()) return;
   const label = periodLabel(app.period.year, app.period.month, cfg.cutoffDay);
@@ -49,7 +50,12 @@ export async function render({ root, isCurrent }) {
       </tbody></table></div></section>`);
 
   requestAnimationFrame(() => root.querySelectorAll('.track > i').forEach((i) => { i.style.width = i.dataset.w + '%'; }));
-  $('#months', root).addEventListener('change', (e) => { months = Number(e.target.value); render({ root, isCurrent }); });
+  $('#months', root).addEventListener('change', (e) => {
+    months = Number(e.target.value);
+    void render({ root, isCurrent, signal }).catch((error) => {
+      if (error?.name !== 'AbortError') toast(error.message || 'No se pudieron actualizar los reportes.', 'error');
+    });
+  });
   draw('monthly-chart', (p) => ({
     type: 'bar',
     data: { labels, datasets: [

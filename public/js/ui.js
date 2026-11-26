@@ -99,8 +99,16 @@ export function passwordDialog({ title, message, confirmText, danger = true, act
 // ── Formularios ──
 export function setLoading(btn, loading, text) {
   if (!btn) return;
-  if (loading) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>${text ? esc(text) : ''}`; }
-  else { btn.disabled = false; if (btn.dataset.label) btn.innerHTML = btn.dataset.label; }
+  if (loading) {
+    btn.dataset.label = btn.innerHTML;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.innerHTML = `<span class="spinner"></span>${text ? esc(text) : ''}`;
+  } else {
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    if (btn.dataset.label) btn.innerHTML = btn.dataset.label;
+  }
 }
 export function showFieldErrors(form, fields = {}) {
   clearFieldErrors(form);

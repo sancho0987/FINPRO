@@ -5,9 +5,9 @@ import { app, canManageHousehold } from '../store.js';
 import { draw, tooltip } from '../charts.js';
 import { openMemberModal, deleteMember } from '../forms.js';
 
-export async function render({ root, isCurrent }) {
+export async function render({ root, isCurrent, signal }) {
   const canManage = canManageHousehold();
-  const s = await api.get('/api/reports/summary', { year: app.period.year, month: app.period.month, today: todayStr() });
+  const s = await api.get('/api/reports/summary', { year: app.period.year, month: app.period.month, today: todayStr() }, { signal });
   if (!isCurrent()) return;
   const total = s.byMember.reduce((a, m) => a + m.spent, 0) + s.unassigned.spent;
   const share = (v) => (total ? Math.round((v / total) * 100) : 0);
