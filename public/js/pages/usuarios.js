@@ -13,6 +13,7 @@ export async function render({ root, isCurrent }) {
   ]);
   if (!isCurrent()) return;
   const st = stats.stats;
+  const canManageAdmins = list.canManageAdmins ?? true;
   const opt = (v, cur, l) => html`<option value="${v}" ${raw(v === cur ? 'selected' : '')}>${l}</option>`;
   setHtml(root, html`
     <div class="page-head"><div><h1>Usuarios</h1><p>Administra las cuentas de FINPRO. Por privacidad no ves los movimientos de nadie.</p></div></div>
@@ -24,16 +25,16 @@ export async function render({ root, isCurrent }) {
         <select class="select" id="u-role" aria-label="Rol">${opt('', F.role, 'Todos los roles')}${opt('admin', F.role, 'Administradores')}${opt('user', F.role, 'Usuarios')}</select>
         <select class="select" id="u-status" aria-label="Estado">${opt('', F.status, 'Todos los estados')}${opt('active', F.status, 'Activos')}${opt('inactive', F.status, 'Desactivados')}</select></form>
       ${list.items.length ? html`<div class="table-wrap"><table class="table stack-m"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Registro</th><th class="r">Movimientos</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>
-        ${list.items.map((u) => { const me = u.id === app.user.id; return html`<tr>
+        ${list.items.map((u) => { const me = u.id === app.user.id; const protectedRole = me || u.isOwner || (!canManageAdmins && u.role === 'admin'); const canManageTarget = !me && !u.isOwner && (canManageAdmins || u.role === 'user'); return html`<tr>
           <td class="full"><div class="cellflex"><span class="avatar" style="width:34px;height:34px;font-size:12px">${initials(u.name)}</span><div style="min-width:0"><div>${u.name}${me ? html` <span class="pill ok">Tú</span>` : ''}</div><div class="faint" style="font-size:12px;word-break:break-all">${u.email}</div></div></div></td>
-          <td data-label="Rol"><select class="select inline-select" data-role="${u.id}" aria-label="Rol de ${u.name}" ${raw(me ? 'disabled' : '')}>${opt('user', u.role, 'Usuario')}${opt('admin', u.role, 'Administrador')}</select></td>
+          <td data-label="Rol">${u.isOwner ? html`<span class="pill info">Titular</span>` : protectedRole ? html`<span class="pill">${u.role === 'admin' ? 'Administrador' : 'Usuario'}</span>` : html`<select class="select inline-select" data-role="${u.id}" aria-label="Rol de ${u.name}">${opt('user', u.role, 'Usuario')}${canManageAdmins ? opt('admin', u.role, 'Administrador') : ''}</select>`}</td>
           <td data-label="Estado"><span class="pill ${u.isActive ? 'ok' : 'bad'}">${u.isActive ? 'Activo' : 'Desactivado'}</span></td>
           <td class="sub" data-label="Registro">${fmtDate(u.createdAt.slice(0, 10), { day: '2-digit', month: 'short', year: 'numeric' })}</td>
           <td class="r mono sub" data-label="Movimientos">${u.txCount}</td>
           <td class="full"><div class="row-actions">
             <button class="btn btn-icon" type="button" data-reset="${u.id}" title="Enviar enlace de recuperación" aria-label="Enviar enlace de recuperación a ${u.name}">${raw(icon('key'))}</button>
-            ${me ? '' : html`<button class="btn btn-sm ${u.isActive ? 'btn-ghost' : 'btn-primary'}" type="button" data-toggle="${u.id}">${u.isActive ? 'Desactivar' : 'Activar'}</button>
-            <button class="btn btn-icon danger" type="button" data-del="${u.id}" aria-label="Eliminar a ${u.name}">${raw(icon('trash'))}</button>`}</div></td></tr>`; })}
+            ${canManageTarget ? html`<button class="btn btn-sm ${u.isActive ? 'btn-ghost' : 'btn-primary'}" type="button" data-toggle="${u.id}">${u.isActive ? 'Desactivar' : 'Activar'}</button>
+            <button class="btn btn-icon danger" type="button" data-del="${u.id}" aria-label="Eliminar a ${u.name}">${raw(icon('trash'))}</button>` : ''}</div></td></tr>`; })}
         </tbody></table></div>
         <div class="pager"><span>${list.total} usuario(s) · Página ${list.page} de ${list.pages}</span><div class="btns">
           <button class="btn btn-sm btn-ghost" type="button" data-page="${list.page - 1}" ${raw(list.page <= 1 ? 'disabled' : '')}>Anterior</button>
@@ -49,7 +50,7 @@ export async function render({ root, isCurrent }) {
   root.__list = list; root.__redo = redo;
   if (root.__bound) return;
   root.__bound = true;
-  const byId = (id) => root.__list.items.find((u) => u.id === Number(id));
+  const byId = (id) => root.__list.items.find((u) => String(u.id) === String(id));
 
   root.addEventListener('change', async (e) => {
     const redo = root.__redo;

@@ -168,9 +168,18 @@ a:hover { text-decoration: underline; }
 .popover .who { padding: 10px 12px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .popover .who b { display: block; font-size: 14px; }
 .popover .who span { font-size: 12px; color: var(--text-3); word-break: break-all; }
+.popover .household-menu { padding: 8px 4px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.popover .household-menu > b { display: block; padding: 2px 8px 6px; color: var(--text-3); font-size: 11px; }
+.popover .household-menu button[aria-current="true"] { color: var(--brand); }
 .popover a, .popover button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: var(--r-sm); font-size: 13.5px; font-weight: 500; color: var(--text); text-align: left; }
 .popover a:hover, .popover button:hover { background: var(--surface-2); text-decoration: none; }
 .popover .danger { color: var(--danger); }
+.invite-list { margin-top: 20px; }
+.invite-list h3 { margin: 0 0 8px; font-size: 13px; }
+.invite-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.invite-row > span { min-width: 0; overflow-wrap: anywhere; }
+.invite-row b, .invite-row small { display: block; }
+.invite-row small { margin-top: 3px; color: var(--text-3); font-size: 12px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }

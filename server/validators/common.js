@@ -54,7 +54,7 @@ const dateStr = z
   .refine(isValidDate, 'Fecha inválida (use AAAA-MM-DD).')
   .refine((d) => d >= '1990-01-01' && d <= '2100-12-31', 'La fecha está fuera del rango permitido.');
 
-const id = z.coerce.number().int().positive();
+const id = z.union([z.coerce.number().int().positive(), z.string().uuid()]);
 const emptyToUndef = (v) => (v === '' || v === null ? undefined : v);
 
 module.exports = { text, optionalText, email, password, color, emoji, money, dateStr, id, emptyToUndef };

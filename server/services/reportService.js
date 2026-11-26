@@ -85,7 +85,7 @@ function summary(userId, { year, month, today }) {
     daily.push({ date: d, amount: fromCents(map.get(d) || 0) });
   }
 
-  const pct = budgetTotal ? Math.round((totals.spent / budgetTotal) * 100) : 0;
+  const pct = budgetTotal ? Math.round((totals.spent / budgetTotal) * 100) : null;
   return {
     period: { from: p.from, to: p.to, year: p.year, month: p.month },
     budgetTotal: fromCents(budgetTotal),
@@ -94,7 +94,7 @@ function summary(userId, { year, month, today }) {
     spent: fromCents(totals.spent),
     income: fromCents(totals.income),
     balance: fromCents(totals.income - totals.spent),
-    available: fromCents(budgetTotal - totals.spent),
+    available: budgetTotal ? fromCents(budgetTotal - totals.spent) : null,
     pct,
     txCount: totals.n,
     antTotal: fromCents(ant.s),

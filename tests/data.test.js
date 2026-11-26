@@ -34,6 +34,31 @@ describe('Movimientos (CRUD)', () => {
     assert.equal((await a.delete(`/api/transactions/${t.id}`)).status, 404);
   });
 
+  test('cambiar gasto a ingreso y viceversa conserva el movimiento y actualiza los totales', async () => {
+    const { a, cat } = await setup();
+    const incomeCat = await categoryId(a, 'Ingresos');
+    const created = await a.post('/api/transactions').send(tx({ categoryId: cat, amount: 1000 }));
+    const id = created.body.transaction.id;
+
+    const income = await a.put(`/api/transactions/${id}`).send(tx({ categoryId: incomeCat, type: 'ingreso', amount: 3500 }));
+    assert.equal(income.status, 200);
+    assert.equal(income.body.transaction.id, id);
+    assert.equal(income.body.transaction.type, 'ingreso');
+    const afterIncome = (await a.get('/api/transactions')).body;
+    assert.equal(afterIncome.total, 1);
+    assert.equal(afterIncome.totals.expense, 0);
+    assert.equal(afterIncome.totals.income, 3500);
+
+    const expense = await a.put(`/api/transactions/${id}`).send(tx({ categoryId: cat, type: 'gasto', amount: 2750 }));
+    assert.equal(expense.status, 200);
+    assert.equal(expense.body.transaction.id, id);
+    assert.equal(expense.body.transaction.type, 'gasto');
+    const afterExpense = (await a.get('/api/transactions')).body;
+    assert.equal(afterExpense.total, 1);
+    assert.equal(afterExpense.totals.expense, 2750);
+    assert.equal(afterExpense.totals.income, 0);
+  });
+
   test('validación: monto, fecha, tipo, descripción y referencias', async () => {
     const { a, cat } = await setup();
     const bad = async (over, field) => {
@@ -193,6 +218,8 @@ describe('Configuración y reportes', () => {
     assert.equal(s.balance, 1892000);
     assert.equal(s.txCount, 3);
     assert.equal(s.budgetTotal, 2430000);
+    assert.equal(s.available, 2322000);
+    assert.equal(s.pct, 4);
     assert.equal(s.antTotal, 8000);
     assert.equal(s.byCategory.find((c) => c.id === cat).spent, 100000);
     assert.equal(s.byMember.find((m) => m.id === member.id).spent, 100000);
@@ -203,6 +230,35 @@ describe('Configuración y reportes', () => {
 
     const m = (await a.get('/api/reports/monthly?year=2026&month=9&months=3')).body.months;
     assert.deepEqual(m.map((x) => x.spent), [0, 5000, 108000]);
+  });
+
+  test('resumen sin presupuesto: no presenta el gasto como disponible ni como progreso', async () => {
+    const { a, cat } = await setup();
+    const categories = (await a.get('/api/categories')).body.categories;
+    await a.put('/api/categories/budgets').send({ budgets: categories.map((c) => ({ id: c.id, budget: 0 })) });
+    await a.post('/api/transactions').send(tx({ categoryId: cat, amount: 102000, date: '2026-10-10' }));
+    await a.post('/api/transactions').send(tx({ categoryId: cat, type: 'ingreso', amount: 250000, date: '2026-10-11' }));
+
+    const s = (await a.get('/api/reports/summary?year=2026&month=9&today=2026-10-14')).body;
+    assert.equal(s.budgetTotal, 0);
+    assert.equal(s.available, null);
+    assert.equal(s.pct, null);
+    assert.equal(s.spent, 102000);
+    assert.equal(s.income, 250000);
+    assert.equal(s.balance, 148000);
+    assert.equal(s.byCategory.find((c) => c.id === cat).spent, 102000);
+  });
+
+  test('resumen con exceso: conserva el restante negativo para indicar el valor excedido', async () => {
+    const { a, cat } = await setup();
+    const categories = (await a.get('/api/categories')).body.categories;
+    await a.put('/api/categories/budgets').send({ budgets: categories.map((c) => ({ id: c.id, budget: c.id === cat ? 100000 : 0 })) });
+    await a.post('/api/transactions').send(tx({ categoryId: cat, amount: 102000, date: '2026-10-10' }));
+
+    const s = (await a.get('/api/reports/summary?year=2026&month=9&today=2026-10-14')).body;
+    assert.equal(s.budgetTotal, 100000);
+    assert.equal(s.available, -2000);
+    assert.equal(s.pct, 102);
   });
 
   test('día de corte desplaza el período', async () => {

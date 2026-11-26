@@ -1,7 +1,7 @@
 'use strict';
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { agent, newUser, PASSWORD, outbox, request, app } = require('./helpers');
+const { agent, newUser, categoryId, PASSWORD, outbox, request, app } = require('./helpers');
 
 describe('Registro', () => {
   test('crea la cuenta, abre sesión con cookie httpOnly y siembra categorías', async () => {
@@ -103,6 +103,7 @@ describe('Login, sesión y logout', () => {
     const res = await request(app).get('/api/health');
     assert.match(res.headers['content-security-policy'], /default-src 'self'/);
     assert.equal(res.headers['x-content-type-options'], 'nosniff');
+    assert.equal(res.headers['referrer-policy'], 'no-referrer');
     assert.equal(res.headers['x-powered-by'], undefined);
   });
 
@@ -178,5 +179,20 @@ describe('Perfil y cuenta', () => {
     assert.equal((await u.a.delete('/api/auth/me').send({ password: 'Mala12345' })).status, 400);
     assert.equal((await u.a.delete('/api/auth/me').send({ password: u.password })).status, 200);
     assert.equal((await agent().post('/api/auth/login').send({ email: u.email, password: u.password })).status, 401);
+  });
+
+  test('no elimina una cuenta con movimientos ni altera su historial', async () => {
+    const u = await newUser();
+    const category = await categoryId(u.a);
+    const created = await u.a.post('/api/transactions').send({ type: 'gasto', amount: 4321, description: 'Registro que debe conservarse', note: '', date: '2026-10-05', categoryId: category });
+    assert.equal(created.status, 201);
+
+    const deletion = await u.a.delete('/api/auth/me').send({ password: u.password });
+    assert.equal(deletion.status, 409);
+    assert.match(deletion.body.error.message, /movimiento/);
+    const persisted = await u.a.get(`/api/transactions/${created.body.transaction.id}`);
+    assert.equal(persisted.status, 200);
+    assert.equal(persisted.body.transaction.amount, 4321);
+    assert.equal((await agent().post('/api/auth/login').send({ email: u.email, password: u.password })).status, 200);
   });
 });

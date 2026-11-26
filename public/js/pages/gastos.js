@@ -69,8 +69,8 @@ export async function render({ root, isCurrent }) {
   root.addEventListener('click', (e) => {
     const { __data: data, __setF: setF } = root;
     if (e.target.closest('[data-add]')) return openTxModal();
-    const ed = e.target.closest('[data-edit]'); if (ed) return openTxModal(data.items.find((t) => t.id === Number(ed.dataset.edit)));
-    const del = e.target.closest('[data-del]'); if (del) return deleteTx(data.items.find((t) => t.id === Number(del.dataset.del)));
+    const ed = e.target.closest('[data-edit]'); if (ed) return openTxModal(data.items.find((t) => String(t.id) === ed.dataset.edit));
+    const del = e.target.closest('[data-del]'); if (del) return deleteTx(data.items.find((t) => String(t.id) === del.dataset.del));
     const pg = e.target.closest('[data-page]'); if (pg && !pg.disabled) return setF({ page: Number(pg.dataset.page) });
     const so = e.target.closest('[data-sort]');
     if (so) { const k = so.dataset.sort; setF(F.sort === k ? { dir: F.dir === 'asc' ? 'desc' : 'asc' } : { sort: k, dir: k === 'description' ? 'asc' : 'desc' }); }

@@ -11,8 +11,10 @@ const sessions = require('./models/sessions');
 const routes = require('./routes');
 
 function createApp() {
-  getDb(); // abre la base y ejecuta migraciones pendientes
-  sessions.purgeExpired();
+  if (!config.useSupabase) {
+    getDb(); // abre la base local y ejecuta migraciones pendientes
+    sessions.purgeExpired();
+  }
 
   const app = express();
   app.disable('x-powered-by');
@@ -27,7 +29,7 @@ function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
-  app.use('/api', apiLimiter, csrfGuard, routes, notFoundApi);
+  app.use('/api', apiLimiter, csrfGuard, config.useSupabase ? require('./routes/supabase') : routes, notFoundApi);
 
   // ── Librerías del frontend servidas localmente (sin CDN) ──
   const nm = path.join(config.root, 'node_modules');
