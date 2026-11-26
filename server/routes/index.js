@@ -30,6 +30,10 @@ api.post('/auth/reset-password', authLimiter, validate('body', S.auth.reset), au
 api.use(requireAuth);
 api.get('/auth/me', authC.me);
 api.patch('/auth/me', validate('body', S.auth.profile), authC.updateProfile);
+api.patch('/auth/me/avatar', validate('body', S.avatar), (req, res) => {
+  const user = require('../models/users').update(req.user.id, { avatar: req.valid.body });
+  res.json({ user: require('../models/users').publicUser(user) });
+});
 api.delete('/auth/me', validate('body', S.auth.confirmPassword), authC.deleteAccount);
 api.post('/auth/change-password', authLimiter, validate('body', S.auth.changePassword), authC.changePassword);
 api.post('/auth/logout-others', authC.logoutOthers);
@@ -47,6 +51,7 @@ api.delete('/categories/:id', catC.remove);
 api.get('/members', memC.list);
 api.post('/members', validate('body', S.member), memC.create);
 api.put('/members/:id', validate('body', S.member), memC.update);
+api.patch('/members/:id/avatar', validate('body', S.avatar), memC.updateAvatar);
 api.delete('/members/:id', memC.remove);
 
 api.get('/transactions', validate('query', S.txQuery), txC.list);

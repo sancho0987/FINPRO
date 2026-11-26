@@ -4,6 +4,8 @@ import { icon } from '../icons.js';
 import { app, canManageHousehold } from '../store.js';
 import { draw, tooltip } from '../charts.js';
 import { openMemberModal, deleteMember } from '../forms.js';
+import { avatarMarkup } from '../components/avatar.js';
+import { editMemberAvatar } from '../components/avatar-editor.js';
 
 export async function render({ root, isCurrent }) {
   const canManage = canManageHousehold();
@@ -18,10 +20,10 @@ export async function render({ root, isCurrent }) {
       ${canManage ? html`<div class="actions"><button class="btn btn-primary" type="button" data-add-member>${raw(icon('plus'))}Añadir miembro</button></div>` : ''}</div>
     <div class="members">
       ${s.byMember.map((m) => html`<article class="member" style="--c:${m.color}">
-        ${canManage ? html`<div class="m-actions"><button class="btn btn-icon" type="button" data-edit="${m.id}" aria-label="Editar ${m.name}">${raw(icon('edit'))}</button>
+        ${canManage ? html`<div class="m-actions"><button class="btn btn-icon" type="button" data-avatar="${m.id}" title="Personalizar avatar" aria-label="Personalizar avatar de ${m.name}">✦</button><button class="btn btn-icon" type="button" data-edit="${m.id}" aria-label="Editar ${m.name}">${raw(icon('edit'))}</button>
           <button class="btn btn-icon danger" type="button" data-del="${m.id}" aria-label="Eliminar ${m.name}">${raw(icon('trash'))}</button></div>
         ` : ''}
-        <div class="m-ava" aria-hidden="true">${m.emoji}</div><h3>${m.name}</h3><span class="role">${m.role}</span>
+        <div class="m-ava">${avatarMarkup(m.avatar, { size: 66, label: `Avatar de ${m.name}`, background: m.color })}</div><h3>${m.name}</h3><span class="role">${m.role}</span>
         <div class="m-amt">${m.spent > 0 ? money(m.spent) : '—'}</div>
         <div class="m-sub">${m.count} gasto(s) · ${share(m.spent)}% del total</div>
         <div class="track" style="--c:${m.color}"><i data-w="${share(m.spent)}"></i></div></article>`)}
@@ -46,6 +48,7 @@ export async function render({ root, isCurrent }) {
   root.addEventListener('click', (e) => {
     if (!canManage) return;
     if (e.target.closest('[data-add-member]')) return openMemberModal();
+    const avatar = e.target.closest('[data-avatar]'); if (avatar) { const member = app.members.find((m) => String(m.id) === avatar.dataset.avatar); if (member) editMemberAvatar(member); return; }
     const ed = e.target.closest('[data-edit]'); if (ed) return openMemberModal(app.members.find((m) => String(m.id) === ed.dataset.edit));
     const del = e.target.closest('[data-del]'); if (del) return deleteMember(app.members.find((m) => String(m.id) === del.dataset.del));
   });

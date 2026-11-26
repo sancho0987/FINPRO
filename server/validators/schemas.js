@@ -4,6 +4,19 @@ const c = require('./common');
 
 const CURRENCIES = ['COP', 'USD', 'EUR', 'MXN', 'ARS'];
 const ROLES = ['Titular', 'Adulto', 'Joven', 'Niño', 'Otro'];
+const avatar = z.object({
+  version: z.literal(1),
+  appearance: z.enum(['masculine', 'feminine', 'neutral']),
+  skin: z.enum(['light', 'fair', 'medium', 'tan', 'brown', 'deep']),
+  hairStyle: z.enum(['short', 'long', 'curly', 'coily', 'bob', 'buzz', 'bald']),
+  hairColor: z.enum(['#211814', '#38251f', '#a65324', '#e0b85b', '#8b5cf6', '#e879a9']),
+  eyes: z.enum(['almond', 'round', 'happy']),
+  brows: z.enum(['soft', 'straight', 'arched']),
+  mouth: z.enum(['smile', 'neutral', 'open']),
+  accessory: z.enum(['none', 'glasses', 'round-glasses', 'cap', 'beanie']),
+  clothing: z.enum(['tee', 'shirt', 'hoodie', 'sweater']),
+  clothingColor: z.enum(['#4fd1a5', '#6b9fff', '#f472b6', '#f0b84a', '#a78bfa', '#f07070', '#334155', '#f8fafc']),
+}).strict();
 
 const auth = {
   register: z.object({
@@ -58,6 +71,7 @@ const member = z.object({
   emoji: c.emoji,
   color: c.color,
 });
+const memberAvatar = z.object({ avatar });
 
 
 const transaction = z.object({
@@ -108,4 +122,4 @@ const admin = {
     .refine((v) => v.role !== undefined || v.isActive !== undefined, 'No hay cambios para aplicar.'),
 };
 
-module.exports = { auth, settings, category, categoryBudgets, member, transaction, txQuery, periodQuery, admin, CURRENCIES, ROLES };
+module.exports = { auth, settings, category, categoryBudgets, member, memberAvatar, avatar, transaction, txQuery, periodQuery, admin, CURRENCIES, ROLES };

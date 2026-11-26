@@ -1,7 +1,8 @@
 'use strict';
 const { getDb } = require('../db');
 
-const toDto = (r) => ({ id: r.id, name: r.name, role: r.role, emoji: r.emoji, color: r.color });
+const parseAvatar = (value) => { try { return JSON.parse(value || '{}'); } catch { return {}; } };
+const toDto = (r) => ({ id: r.id, name: r.name, role: r.role, emoji: r.emoji, color: r.color, avatar: parseAvatar(r.avatar_json) });
 
 const list = (userId) => getDb().prepare('SELECT * FROM members WHERE user_id = ? ORDER BY id').all(userId).map(toDto);
 const find = (userId, id) => {
@@ -18,8 +19,12 @@ function update(userId, id, m) {
   getDb().prepare('UPDATE members SET name = ?, role = ?, emoji = ?, color = ? WHERE id = ? AND user_id = ?').run(m.name, m.role, m.emoji, m.color, id, userId);
   return find(userId, id);
 }
+function updateAvatar(userId, id, avatar) {
+  getDb().prepare('UPDATE members SET avatar_json = ? WHERE id = ? AND user_id = ?').run(JSON.stringify(avatar), id, userId);
+  return find(userId, id);
+}
 const remove = (userId, id) => getDb().prepare('DELETE FROM members WHERE id = ? AND user_id = ?').run(id, userId);
 const countTransactions = (userId, id) =>
   getDb().prepare('SELECT COUNT(*) c FROM transactions WHERE user_id = ? AND member_id = ?').get(userId, id).c;
 
-module.exports = { list, find, create, update, remove, countTransactions };
+module.exports = { list, find, create, update, updateAvatar, remove, countTransactions };

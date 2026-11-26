@@ -1,8 +1,10 @@
 import { api } from '../api.js';
-import { html, raw, setHtml, $, initials, fmtDate } from '../utils.js';
+import { html, raw, setHtml, $, fmtDate } from '../utils.js';
 import { app, notifyChange } from '../store.js';
 import { toast, setLoading, showFieldErrors, clearFieldErrors, setFormError, runRules, validators as v, passwordDialog, confirmDialog, passwordToggle, liveValidate } from '../ui.js';
 import { icon } from '../icons.js';
+import { avatarMarkup } from '../components/avatar.js';
+import { editProfileAvatar } from '../components/avatar-editor.js';
 
 export async function render({ root }) {
   const u = app.user;
@@ -10,8 +12,8 @@ export async function render({ root }) {
     <div class="page-head"><div><h1>Mi perfil</h1><p>Datos de tu cuenta y seguridad</p></div></div>
     <div class="grid-2">
       <section class="panel"><div class="panel-head"><h2>Datos personales</h2><span class="pill ${u.role === 'admin' ? 'info' : ''}">${u.role === 'admin' ? 'Administrador' : 'Usuario'}</span></div>
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><span class="avatar" style="width:56px;height:56px;font-size:18px">${initials(u.name)}</span>
-          <div class="muted" style="font-size:13px">Cuenta creada el ${fmtDate(u.createdAt.slice(0, 10), { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
+        <div class="profile-avatar-row">${avatarMarkup(u.avatar, { size: 68, label: `Tu avatar, ${u.name}` })}<div class="profile-avatar-actions"><button class="btn btn-ghost btn-sm" type="button" id="edit-profile-avatar">✦ Personalizar avatar</button>
+          <div class="muted" style="font-size:13px">Cuenta creada el ${fmtDate(u.createdAt.slice(0, 10), { day: 'numeric', month: 'long', year: 'numeric' })}</div></div></div>
         <form id="profile-form" novalidate><div class="form-error" hidden role="alert"></div>
           <div class="field"><label for="p-name">Nombre</label><input class="input" id="p-name" name="name" maxlength="80" value="${u.name}" required><span class="error"></span></div>
           <div class="field"><label for="p-email">Correo electrónico</label><input class="input" id="p-email" name="email" type="email" value="${u.email}" required><span class="error"></span></div>
@@ -29,6 +31,7 @@ export async function render({ root }) {
       <div class="action-row"><div><b>Eliminar mi cuenta</b><span>Borra tu cuenta y todos tus datos de forma permanente.</span></div><button class="btn btn-danger" type="button" id="del-acc">Eliminar cuenta</button></div></section>`);
 
   passwordToggle(root);
+  $('#edit-profile-avatar', root).addEventListener('click', editProfileAvatar);
   const pf = $('#profile-form', root);
   const pr = { name: (x) => (x.trim().length < 2 ? 'Escribe tu nombre (mínimo 2 letras).' : ''), email: v.email };
   liveValidate(pf, pr);

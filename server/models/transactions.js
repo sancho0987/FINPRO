@@ -4,7 +4,7 @@ const { toCents, fromCents } = require('../utils/money');
 
 const SELECT = `
   SELECT t.*, c.name AS category_name, c.emoji AS category_emoji, c.color AS category_color, c.is_ant AS category_is_ant,
-         m.name AS member_name, m.emoji AS member_emoji, m.color AS member_color
+         m.name AS member_name, m.emoji AS member_emoji, m.color AS member_color, m.avatar_json AS member_avatar_json
   FROM transactions t
   JOIN categories c ON c.id = t.category_id
   LEFT JOIN members m ON m.id = t.member_id`;
@@ -19,7 +19,7 @@ const toDto = (r, antLimitCents = 0) => ({
   categoryId: r.category_id,
   memberId: r.member_id,
   category: { id: r.category_id, name: r.category_name, emoji: r.category_emoji, color: r.category_color },
-  member: r.member_id ? { id: r.member_id, name: r.member_name, emoji: r.member_emoji, color: r.member_color } : null,
+  member: r.member_id ? { id: r.member_id, name: r.member_name, emoji: r.member_emoji, color: r.member_color, avatar: (() => { try { return JSON.parse(r.member_avatar_json || '{}'); } catch { return {}; } })() } : null,
   isAnt: r.type === 'gasto' && (!!r.category_is_ant || (antLimitCents > 0 && r.amount_cents < antLimitCents)),
   createdAt: r.created_at,
   updatedAt: r.updated_at,

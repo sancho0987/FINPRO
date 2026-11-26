@@ -1,7 +1,8 @@
 // Shell de la aplicación: navegación, período, menú de usuario y enrutador por hash.
 import { api, setUnauthorizedHandler } from './api.js';
-import { html, raw, setHtml, $, $$, periodLabel, initials } from './utils.js';
+import { html, raw, setHtml, $, $$, periodLabel } from './utils.js';
 import { icon } from './icons.js';
+import { avatarMarkup } from './components/avatar.js';
 import { app, bus, loadMeta } from './store.js';
 import { toast, toggleTheme, getTheme } from './ui.js';
 import { destroyAll } from './charts.js';
@@ -29,8 +30,8 @@ function paintShell() {
   const link = (key) => { const r = ROUTES[key]; return html`<a href="#/${key}" data-route="${key}">${raw(icon(r.icon))}<span>${r.title}</span></a>`; };
   setHtml($('#nav'), html`<div class="nav-group" style="padding-top:0">Principal</div>${['dashboard', 'gastos', 'familia', 'reportes'].map(link)}
     <div class="nav-group">Cuenta</div>${['config', 'perfil'].map(link)}${u.role === 'admin' ? link('usuarios') : ''}`);
-  setHtml($('#user-chip'), html`<span class="avatar">${initials(u.name)}</span><span class="meta"><b>${u.name}</b><span>${u.role === 'admin' ? 'Administrador' : 'Usuario'}</span></span>`);
-  setHtml($('#top-avatar'), html`<span class="avatar">${initials(u.name)}</span>`);
+  setHtml($('#user-chip'), html`${avatarMarkup(u.avatar, { size: 34, label: `Avatar de ${u.name}` })}<span class="meta"><b>${u.name}</b><span>${u.role === 'admin' ? 'Administrador' : 'Usuario'}</span></span>`);
+  setHtml($('#top-avatar'), avatarMarkup(u.avatar, { size: 36, label: `Avatar de ${u.name}` }));
   setHtml($('#top-add'), html`${raw(icon('plus'))}Nuevo movimiento`);
   const tab = (key) => { const r = ROUTES[key]; return html`<a href="#/${key}" data-route="${key}">${raw(icon(r.icon))}<span>${r.title}</span></a>`; };
   setHtml($('#tabbar'), html`${tab('dashboard')}${tab('gastos')}<button class="fab" type="button" data-action="add-tx" aria-label="Nuevo movimiento">${raw(icon('plus'))}</button>${tab('familia')}${tab('reportes')}`);

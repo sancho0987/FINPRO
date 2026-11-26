@@ -54,7 +54,7 @@ async function categoriesFor(req, periodStart) {
 
 async function membersFor(req) {
   return check(await req.supabase.from('family_members').select('*').eq('household_id', req.householdId).order('created_at'), 'No se pudieron cargar los miembros.')
-    .map((m) => ({ id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color }));
+    .map((m) => ({ id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color, avatar: m.avatar || {} }));
 }
 
 async function readTransactions(req, { from, to, type, categoryId, memberId, q, minAmount, maxAmount } = {}) {
@@ -84,7 +84,7 @@ async function decorateTransactions(req, rows, antLimit) {
   const memberIds = [...new Set(rows.map((r) => r.family_member_id).filter(Boolean))];
   const [catRows, memberRows] = await Promise.all([
     categoryIds.length ? req.supabase.from('categories').select('id,name,emoji,color,is_ant').eq('household_id', req.householdId).in('id', categoryIds) : { data: [], error: null },
-    memberIds.length ? req.supabase.from('family_members').select('id,name,emoji,color').eq('household_id', req.householdId).in('id', memberIds) : { data: [], error: null },
+    memberIds.length ? req.supabase.from('family_members').select('id,name,emoji,color,avatar').eq('household_id', req.householdId).in('id', memberIds) : { data: [], error: null },
   ]);
   const cats = new Map(check(catRows, 'No se pudieron cargar las categorías relacionadas.').map((c) => [c.id, c]));
   const members = new Map(check(memberRows, 'No se pudieron cargar los miembros relacionados.').map((m) => [m.id, m]));
@@ -95,7 +95,7 @@ async function decorateTransactions(req, rows, antLimit) {
       id: t.id, type: t.type, amount: fromCents(t.amount_cents), description: t.description, note: t.note || '', date: t.date,
       categoryId: t.category_id, memberId: t.family_member_id,
       category: c ? { id: c.id, name: c.name, emoji: c.emoji, color: c.color } : null,
-      member: m ? { id: m.id, name: m.name, emoji: m.emoji, color: m.color } : null,
+      member: m ? { id: m.id, name: m.name, emoji: m.emoji, color: m.color, avatar: m.avatar || {} } : null,
       isAnt: t.type === 'gasto' && (!!c?.is_ant || (antLimit > 0 && t.amount_cents < antLimit)),
       createdAt: t.created_at, updatedAt: t.updated_at,
     };
@@ -183,7 +183,7 @@ async function summary(req, period) {
   const income = rows.filter((r) => r.type === 'ingreso').reduce((s, r) => s + r.amount_cents, 0);
   const catMap = new Map(data.cats.map((c) => [c.id, { id: c.id, name: c.name, emoji: c.emoji, color: c.color, isAnt: c.is_ant,
     budgetCents: data.budgets.get(c.id) || 0, spent: 0, income: 0, count: 0 }]));
-  const memMap = new Map(data.members.map((m) => [m.id, { id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color, spent: 0, count: 0 }]));
+  const memMap = new Map(data.members.map((m) => [m.id, { id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color, avatar: m.avatar || {}, spent: 0, count: 0 }]));
   let unassignedCents = 0, unassignedCount = 0, antCents = 0, antCount = 0;
   for (const t of rows) {
     const c = catMap.get(t.category_id);
@@ -239,8 +239,8 @@ async function createCategory(req, body) {
 }
 
 async function authMe(req) {
-  const profile = check(await req.supabase.from('profiles').select('full_name,email').eq('id', req.user.id).maybeSingle());
-  return { ...req.user, name: profile?.full_name || req.user.name, email: profile?.email || req.user.email };
+  const profile = check(await req.supabase.from('profiles').select('full_name,email,avatar').eq('id', req.user.id).maybeSingle());
+  return { ...req.user, name: profile?.full_name || req.user.name, email: profile?.email || req.user.email, avatar: profile?.avatar || {} };
 }
 
 async function bootstrap(req, res) {
@@ -256,6 +256,10 @@ async function bootstrap(req, res) {
 function makeRouterHandlers(router) {
   router.get('/bootstrap', bootstrap);
   router.get('/auth/me', async (req, res) => res.json({ user: await authMe(req) }));
+  router.patch('/auth/me/avatar', validate('body', S.avatar), async (req, res) => {
+    const updated = check(await req.supabase.from('profiles').update({ avatar: req.valid.body }).eq('id', req.user.id).select('avatar').single(), 'No se pudo guardar tu avatar.');
+    res.json({ user: { ...await authMe(req), avatar: updated.avatar } });
+  });
   router.get('/settings', async (req, res) => res.json({ settings: settingsDto(await settingsRow(req)) }));
   router.put('/settings', validate('body', S.settings), async (req, res) => {
     const s = req.valid.body;
@@ -305,12 +309,17 @@ function makeRouterHandlers(router) {
   router.get('/members', async (req, res) => res.json({ members: await membersFor(req) }));
   router.post('/members', validate('body', S.member), async (req, res) => {
     const b = req.valid.body; const m = check(await req.supabase.from('family_members').insert({ household_id: req.householdId, name: b.name, role: b.role, emoji: b.emoji, color: b.color }).select('*').single());
-    res.status(201).json({ member: { id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color } });
+    res.status(201).json({ member: { id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color, avatar: m.avatar || {} } });
   });
   router.put('/members/:id', validate('body', S.member), async (req, res) => {
     const b = req.valid.body; const m = check(await req.supabase.from('family_members').update({ name: b.name, role: b.role, emoji: b.emoji, color: b.color }).eq('household_id', req.householdId).eq('id', req.params.id).select('*').maybeSingle());
     if (!m) throw notFound('Miembro no encontrado.');
-    res.json({ member: { id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color } });
+    res.json({ member: { id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color, avatar: m.avatar || {} } });
+  });
+  router.patch('/members/:id/avatar', validate('body', S.avatar), async (req, res) => {
+    const m = check(await req.supabase.from('family_members').update({ avatar: req.valid.body }).eq('household_id', req.householdId).eq('id', req.params.id).select('*').maybeSingle(), 'No se pudo guardar el avatar.');
+    if (!m) throw notFound('Miembro no encontrado.');
+    res.json({ member: { id: m.id, name: m.name, role: m.role, emoji: m.emoji, color: m.color, avatar: m.avatar || {} } });
   });
   router.delete('/members/:id', async (req, res) => {
     const kept = rowCount(await req.supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId).eq('family_member_id', req.params.id));
@@ -368,7 +377,7 @@ function makeRouterHandlers(router) {
     const cfg = await settingsRow(req); const p = currentPeriod(cfg.cutoff_day); const [categories, members, rows, user] = await Promise.all([categoriesFor(req, p.from), membersFor(req), readTransactions(req), authMe(req)]);
     const decorated = await decorateTransactions(req, rows, 0);
     res.setHeader('Content-Disposition', 'attachment; filename="finpro-datos.json"');
-    res.json({ exportedAt: new Date().toISOString(), user: { name: user.name, email: user.email }, settings: settingsDto(cfg), categories, members,
+    res.json({ exportedAt: new Date().toISOString(), user: { name: user.name, email: user.email, avatar: user.avatar }, settings: settingsDto(cfg), categories, members,
       transactions: decorated.map((t) => ({ id: t.id, type: t.type, amount: t.amount, description: t.description, note: t.note, date: t.date, category: t.category?.name, member: t.member?.name || null })) });
   });
   router.post('/data/wipe', validate('body', S.auth.confirmPassword), async (req, res) => {
@@ -391,7 +400,7 @@ function makeRouterHandlers(router) {
   router.get('/admin/users', validate('query', S.admin.listUsers), async (req, res) => {
     if (!['owner', 'admin'].includes(req.membershipRole)) return failRls(res);
     const q = req.valid.query;
-    const base = check(await req.supabase.from('household_members').select('household_id,user_id,role,is_active,joined_at,profiles(id,full_name,email)', { count: 'exact' }).eq('household_id', req.householdId).order('joined_at', { ascending: false }), 'No se pudo cargar el hogar.');
+    const base = check(await req.supabase.from('household_members').select('household_id,user_id,role,is_active,joined_at,profiles(id,full_name,email,avatar)', { count: 'exact' }).eq('household_id', req.householdId).order('joined_at', { ascending: false }), 'No se pudo cargar el hogar.');
     const filtered = base.filter((m) => (!q.q || `${m.profiles?.full_name} ${m.profiles?.email}`.toLowerCase().includes(q.q.toLowerCase()))
       && (!q.role || (q.role === 'admin' ? ['owner','admin'].includes(m.role) : m.role === 'member'))
       && (!q.status || (q.status === 'active' ? m.is_active : !m.is_active)));
@@ -401,7 +410,7 @@ function makeRouterHandlers(router) {
         req.supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
         req.supabase.from('family_members').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
       ]);
-      return { id: m.user_id, name: m.profiles?.full_name || '', email: m.profiles?.email || '', role: m.role === 'member' ? 'user' : 'admin', isOwner: m.role === 'owner', isActive: m.is_active, createdAt: m.joined_at, txCount: tx.count || 0, memberCount: mem.count || 0 };
+      return { id: m.user_id, name: m.profiles?.full_name || '', email: m.profiles?.email || '', avatar: m.profiles?.avatar || {}, role: m.role === 'member' ? 'user' : 'admin', isOwner: m.role === 'owner', isActive: m.is_active, createdAt: m.joined_at, txCount: tx.count || 0, memberCount: mem.count || 0 };
     }));
     res.json({ items, total: filtered.length, page: q.page, limit: q.limit, pages: Math.max(1, Math.ceil(filtered.length / q.limit)), canManageAdmins: req.membershipRole === 'owner' });
   });

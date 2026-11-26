@@ -4,6 +4,7 @@ import { icon } from '../icons.js';
 import { app } from '../store.js';
 import { openTxModal, deleteTx } from '../forms.js';
 import { antPill } from '../components/tx.js';
+import { avatarMarkup } from '../components/avatar.js';
 
 // Los filtros se conservan al cambiar de sección o recargar datos
 const F = { q: '', type: '', categoryId: '', memberId: '', scope: 'period', sort: 'date', dir: 'desc', page: 1 };
@@ -39,7 +40,7 @@ export async function render({ root, isCurrent }) {
         ${data.items.map((t) => html`<tr>
           <td class="c-desc"><div class="cellflex"><span>${t.description}</span>${t.isAnt ? antPill : ''}</div>${t.note ? html`<div class="faint" style="font-size:12px">${t.note}</div>` : ''}</td>
           <td class="sub c-cat"><span class="cellflex"><span class="dot" style="--c:${t.category.color}"></span>${t.category.emoji} ${t.category.name}</span></td>
-          <td class="sub c-mem">${t.member ? `${t.member.emoji} ${t.member.name}` : html`<span class="faint">Sin asignar</span>`}</td>
+          <td class="sub c-mem">${t.member ? html`<span class="member-cell">${avatarMarkup(t.member.avatar, { size: 25, label: `Avatar de ${t.member.name}`, background: t.member.color })}<span>${t.member.name}</span></span>` : html`<span class="faint">Sin asignar</span>`}</td>
           <td class="sub c-date">${fmtDate(t.date, { day: '2-digit', month: 'short', year: 'numeric' })}</td>
           <td class="r c-amt"><span class="amt ${t.type === 'ingreso' ? 'pos' : 'neg'}">${t.type === 'ingreso' ? '+' : '−'}${money(t.amount)}</span></td>
           <td class="full c-act"><div class="row-actions"><button class="btn btn-icon" type="button" data-edit="${t.id}" aria-label="Editar ${t.description}">${raw(icon('edit'))}</button>

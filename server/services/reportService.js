@@ -39,7 +39,7 @@ function summary(userId, { year, month, today }) {
 
   const byMember = db
     .prepare(
-      `SELECT m.id, m.name, m.role, m.emoji, m.color,
+        `SELECT m.id, m.name, m.role, m.emoji, m.color, m.avatar_json,
               COALESCE(SUM(CASE WHEN t.type='gasto' THEN t.amount_cents END),0) AS spent,
               COALESCE(SUM(CASE WHEN t.type='gasto' THEN 1 END),0) AS n
        FROM members m
@@ -47,7 +47,7 @@ function summary(userId, { year, month, today }) {
        WHERE m.user_id = ? GROUP BY m.id ORDER BY m.id`
     )
     .all(p.from, p.to, userId)
-    .map((r) => ({ id: r.id, name: r.name, role: r.role, emoji: r.emoji, color: r.color, spent: fromCents(r.spent), count: r.n }));
+      .map((r) => ({ id: r.id, name: r.name, role: r.role, emoji: r.emoji, color: r.color, avatar: (() => { try { return JSON.parse(r.avatar_json || '{}'); } catch { return {}; } })(), spent: fromCents(r.spent), count: r.n }));
 
   const unassigned = db
     .prepare(

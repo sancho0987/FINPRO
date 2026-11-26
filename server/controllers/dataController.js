@@ -34,7 +34,7 @@ exports.exportJson = (req, res) => {
   const cfg = settings.get(uid);
   const payload = {
     exportedAt: new Date().toISOString(),
-    user: { name: req.user.name, email: req.user.email },
+    user: { name: req.user.name, email: req.user.email, avatar: req.user.avatar },
     settings: cfg,
     categories: categories.list(uid),
     members: members.list(uid),
