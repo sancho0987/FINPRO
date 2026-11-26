@@ -8,7 +8,7 @@ const express = require('express');
 const request = require('supertest');
 const config = require('../server/config');
 const { register } = require('../server/supabase/auth');
-const { makeRouterHandlers, budgetTotals, settingsDto } = require('../server/supabase/api');
+const { makeRouterHandlers, budgetTotals, pageTransactions, settingsDto } = require('../server/supabase/api');
 
 test('Supabase respeta el cierre de registro antes de llamar al proveedor de identidad', async (t) => {
   const originalAllowRegistration = config.allowRegistration;
@@ -76,10 +76,56 @@ test('Supabase usa el presupuesto global cuando existe y conserva el total por c
   });
 });
 
+test('La lista Supabase delega filtros, orden, paginación y totales a la RPC de base de datos', async () => {
+  let rpcCall;
+  const settingsQuery = {
+    select: () => ({ eq: () => ({ single: async () => ({ data: {
+      name: 'Casa', currency: 'COP', cutoff_day: 1, alert_pct: 80, ant_limit_cents: 0, monthly_budget_cents: 0,
+    }, error: null }) }) }),
+  };
+  const req = {
+    householdId: 'household-1',
+    supabase: {
+      from: (table) => {
+        assert.equal(table, 'households');
+        return settingsQuery;
+      },
+      rpc: async (...args) => {
+        rpcCall = args;
+        return { data: { items: [], total: 42, income_cents: 500000, expense_cents: 125000 }, error: null };
+      },
+    },
+  };
+
+  const page = await pageTransactions(req, {
+    from: '2026-01-01', to: '2026-01-31', type: 'gasto', categoryId: 'category-1', memberId: 'none',
+    q: 'mercado', minAmount: 10, maxAmount: 500, sort: 'amount', dir: 'asc', page: 3, limit: 15,
+  });
+
+  assert.equal(rpcCall[0], 'get_transactions_page');
+  assert.deepEqual(rpcCall[1], {
+    p_household_id: 'household-1', p_from: '2026-01-01', p_to: '2026-01-31', p_type: 'gasto', p_category_id: 'category-1',
+    p_member_id: null, p_unassigned: true, p_query: 'mercado', p_min_amount_cents: 1000, p_max_amount_cents: 50000,
+    p_sort: 'amount', p_desc: false, p_limit: 15, p_offset: 30,
+  });
+  assert.deepEqual(page, {
+    items: [], total: 42, page: 3, limit: 15, pages: 3, totals: { income: 5000, expense: 1250 },
+  });
+});
+
 test('La migración mensual es aditiva y reinicia el presupuesto global al borrar datos', () => {
   const sql = readFileSync('supabase/migrations/202611260001_add_monthly_budget.sql', 'utf8');
   assert.match(sql, /add column if not exists monthly_budget_cents bigint not null default 0/i);
   assert.match(sql, /monthly_budget_cents >= 0/i);
   assert.match(sql, /monthly_budget_cents = 0/i);
   assert.match(sql, /grant execute on function public\.wipe_own_household\(\) to authenticated/i);
+});
+
+test('La migración de movimientos conserva RLS y limita los argumentos de paginación', () => {
+  const sql = readFileSync('supabase/migrations/202611260002_transaction_page_rpc.sql', 'utf8');
+  assert.match(sql, /from public\.transactions t/i);
+  assert.match(sql, /security invoker/i);
+  assert.doesNotMatch(sql, /security definer/i);
+  assert.match(sql, /limit least\(greatest\(coalesce\(p_limit, 20\), 1\), 100\)/i);
+  assert.match(sql, /grant execute on function public\.get_transactions_page/i);
 });

@@ -118,24 +118,37 @@ async function decorateTransactions(req, rows, antLimit) {
   });
 }
 
-function sortTransactions(rows, sort, dir) {
-  const sign = dir === 'asc' ? 1 : -1;
-  return rows.sort((a, b) => {
-    const av = sort === 'amount' ? a.amount_cents : sort === 'description' ? a.description.toLocaleLowerCase() : a.date;
-    const bv = sort === 'amount' ? b.amount_cents : sort === 'description' ? b.description.toLocaleLowerCase() : b.date;
-    return (av < bv ? -1 : av > bv ? 1 : 0) * sign || String(b.id).localeCompare(String(a.id));
-  });
-}
-
 async function pageTransactions(req, filters = {}) {
   const cfg = await settingsRow(req);
-  const rows = await readTransactions(req, filters);
-  const totals = rows.reduce((a, r) => { a[r.type] += r.amount_cents; return a; }, { gasto: 0, ingreso: 0 });
   const page = Number(filters.page) || 1;
   const limit = Number(filters.limit) || 20;
-  const ordered = sortTransactions(rows, filters.sort, filters.dir);
-  const items = await decorateTransactions(req, ordered.slice((page - 1) * limit, page * limit), cfg.ant_limit_cents);
-  return { items, total: rows.length, page, limit, pages: Math.max(1, Math.ceil(rows.length / limit)), totals: { income: fromCents(totals.ingreso), expense: fromCents(totals.gasto) } };
+  const memberId = filters.memberId || null;
+  const result = check(await req.supabase.rpc('get_transactions_page', {
+    p_household_id: req.householdId,
+    p_from: filters.from || null,
+    p_to: filters.to || null,
+    p_type: filters.type || null,
+    p_category_id: filters.categoryId || null,
+    p_member_id: memberId === 'none' ? null : memberId,
+    p_unassigned: memberId === 'none',
+    p_query: filters.q?.trim() || null,
+    p_min_amount_cents: filters.minAmount === undefined ? null : toCents(filters.minAmount),
+    p_max_amount_cents: filters.maxAmount === undefined ? null : toCents(filters.maxAmount),
+    p_sort: filters.sort || 'date',
+    p_desc: filters.dir !== 'asc',
+    p_limit: limit,
+    p_offset: (page - 1) * limit,
+  }), 'No se pudieron cargar los movimientos.');
+  const total = Number(result?.total) || 0;
+  const items = await decorateTransactions(req, result?.items || [], cfg.ant_limit_cents);
+  return {
+    items,
+    total,
+    page,
+    limit,
+    pages: Math.max(1, Math.ceil(total / limit)),
+    totals: { income: fromCents(result?.income_cents), expense: fromCents(result?.expense_cents) },
+  };
 }
 
 async function oneTransaction(req, id) {
@@ -415,12 +428,20 @@ function makeRouterHandlers(router) {
       && (!q.role || (q.role === 'admin' ? ['owner','admin'].includes(m.role) : m.role === 'member'))
       && (!q.status || (q.status === 'active' ? m.is_active : !m.is_active)));
     const pageItems = filtered.slice((q.page - 1) * q.limit, q.page * q.limit);
-    const items = await Promise.all(pageItems.map(async (m) => {
-      const [tx, mem] = await Promise.all([
-        req.supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
-        req.supabase.from('family_members').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
-      ]);
-      return { id: m.user_id, name: m.profiles?.full_name || '', email: m.profiles?.email || '', role: m.role === 'member' ? 'user' : 'admin', isOwner: m.role === 'owner', isActive: m.is_active, createdAt: m.joined_at, txCount: tx.count || 0, memberCount: mem.count || 0 };
+    const [tx, mem] = await Promise.all([
+      req.supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
+      req.supabase.from('family_members').select('id', { count: 'exact', head: true }).eq('household_id', req.householdId),
+    ]);
+    const items = pageItems.map((m) => ({
+      id: m.user_id,
+      name: m.profiles?.full_name || '',
+      email: m.profiles?.email || '',
+      role: m.role === 'member' ? 'user' : 'admin',
+      isOwner: m.role === 'owner',
+      isActive: m.is_active,
+      createdAt: m.joined_at,
+      txCount: tx.count || 0,
+      memberCount: mem.count || 0,
     }));
     res.json({ items, total: filtered.length, page: q.page, limit: q.limit, pages: Math.max(1, Math.ceil(filtered.length / q.limit)), canManageAdmins: req.membershipRole === 'owner' });
   });
@@ -455,4 +476,4 @@ function makeRouterHandlers(router) {
   });
 }
 
-module.exports = { makeRouterHandlers, updateSupabaseTransaction, manageHouseholdMember, settingsDto, budgetTotals };
+module.exports = { makeRouterHandlers, updateSupabaseTransaction, manageHouseholdMember, settingsDto, budgetTotals, pageTransactions };
