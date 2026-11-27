@@ -4,18 +4,85 @@ const c = require('./common');
 
 const CURRENCIES = ['COP', 'USD', 'EUR', 'MXN', 'ARS'];
 const ROLES = ['Titular', 'Adulto', 'Joven', 'Niño', 'Otro'];
+const AVATAR_ACCESSORY_SLOTS = [
+  ['cap', 'beanie', 'hat', 'beret', 'crown', 'headband', 'flower-crown', 'cowboy-hat', 'visor', 'helmet', 'pirate-hat', 'wizard-hat', 'chef-hat', 'antenna', 'halo', 'cat-ears', 'bunny-ears', 'devil-horns', 'antlers', 'top-hat', 'knight-helmet', 'nurse-cap', 'crescent-crown', 'star-headband'],
+  ['wig-afro', 'wig-braids', 'wig-rainbow', 'wig-copper', 'wig-mohawk'],
+  ['glasses', 'round-glasses', 'sunglasses', 'heart-glasses', 'star-glasses', 'safety-goggles', 'monocle'],
+  ['mask', 'masquerade-mask', 'domino-mask'],
+  ['face-paint-stars', 'face-paint-stripe', 'whisker-paint'],
+  ['beard-stubble', 'beard-short', 'beard-full', 'beard-goatee', 'beard-viking', 'beard-long', 'beard-braided', 'beard-shadow'],
+  ['moustache', 'moustache-curly', 'moustache-handlebar', 'moustache-pencil', 'moustache-walrus'],
+  ['earrings-hoop', 'earrings-stud', 'ear-cuff', 'earrings-drop'], ['headphones', 'headset', 'earphones'],
+  ['scarf', 'bandana', 'tie', 'bowtie', 'choker', 'neck-ribbon'], ['necklace-star', 'necklace-pearl', 'necklace-moon'], ['star-pin', 'shell'], ['bow', 'flower', 'leaf', 'flower-barrette'],
+  ['bun', 'twin-buns', 'wavy-bob', 'fringe', 'undercut', 'wig-afro', 'wig-braids', 'wig-rainbow', 'wig-copper', 'wig-mohawk'],
+  ['square-glasses', 'aviators', 'glasses', 'round-glasses', 'sunglasses', 'heart-glasses', 'star-glasses', 'safety-goggles'],
+  ['mask', 'masquerade-mask', 'domino-mask', 'eye-patch', 'robot-visor', 'gas-mask'],
+  ['freckles', 'freckles-gold'],
+];
+const AVATAR_OVERLAP_GROUPS = {
+  headwear: new Set(['cap', 'beanie', 'hat', 'beret', 'crown', 'headband', 'flower-crown', 'cowboy-hat', 'visor', 'helmet', 'pirate-hat', 'wizard-hat', 'chef-hat', 'antenna', 'halo', 'cat-ears', 'bunny-ears', 'devil-horns', 'antlers', 'top-hat', 'knight-helmet', 'nurse-cap', 'crescent-crown', 'star-headband']),
+  hairClips: new Set(['bow', 'flower', 'leaf', 'flower-barrette']),
+  masks: new Set(['mask', 'masquerade-mask', 'domino-mask', 'eye-patch', 'robot-visor', 'gas-mask']),
+  facialHair: new Set(['beard-stubble', 'beard-short', 'beard-full', 'beard-goatee', 'beard-viking', 'beard-long', 'beard-braided', 'beard-shadow', 'moustache', 'moustache-curly', 'moustache-handlebar', 'moustache-pencil', 'moustache-walrus']),
+  audio: new Set(['headphones', 'headset', 'earphones']),
+  earrings: new Set(['earrings-hoop', 'earrings-stud', 'ear-cuff', 'earrings-drop']),
+  neckwear: new Set(['scarf', 'bandana', 'tie', 'bowtie', 'choker', 'neck-ribbon']),
+  necklaces: new Set(['necklace-star', 'necklace-pearl', 'necklace-moon']),
+};
+const hasGroup = (items, group) => items.some((item) => group.has(item));
 const avatar = z.object({
   version: z.literal(1),
+  style: z.literal('custom').optional(),
+  character: z.enum([
+    'luna', 'mateo', 'kiwi', 'michi', 'cosmo', 'pixel', 'zuri', 'bruno', 'ines', 'diego', 'amara', 'tomas',
+    'valentina', 'kai', 'omar', 'zoe', 'rafa', 'sofia', 'zorro', 'conejo', 'panda', 'rana', 'buho', 'tigre',
+    'perro', 'pinguino', 'mapache', 'koala', 'leon', 'tortuga', 'dragon', 'unicornio', 'hada', 'sirena', 'fenix',
+    'fantasma', 'mago', 'vampiro', 'slime', 'alien', 'taco', 'cactus', 'astronauta', 'pirata', 'chef', 'disco',
+    'ninja', 'exploradora', 'inventor', 'superheroina', 'astronomo', 'jardinera', 'alma', 'lucas', 'noor', 'inesa',
+    'ciervo', 'tiburon', 'erizo', 'ajolote', 'polilla', 'golem', 'seta', 'nube',
+  ]),
   appearance: z.enum(['masculine', 'feminine', 'neutral']),
   skin: z.enum(['light', 'fair', 'medium', 'tan', 'brown', 'deep']),
-  hairStyle: z.enum(['short', 'long', 'curly', 'coily', 'bob', 'buzz', 'bald']),
-  hairColor: z.enum(['#211814', '#38251f', '#a65324', '#e0b85b', '#8b5cf6', '#e879a9']),
-  eyes: z.enum(['almond', 'round', 'happy']),
+  hairStyle: z.enum(['short', 'long', 'curly', 'coily', 'bob', 'buzz', 'bald', 'ponytail', 'braids', 'mohawk', 'pigtails', 'side-swept', 'bun', 'twin-buns', 'wavy-bob', 'fringe', 'undercut']),
+  hairColor: z.enum(['#211814', '#38251f', '#a65324', '#e0b85b', '#8b5cf6', '#e879a9', '#4fd1a5', '#6b9fff', '#f0b84a', '#f07070', '#334155', '#f8fafc', '#94a3b8']),
+  eyes: z.enum(['almond', 'round', 'happy', 'starry', 'sleepy', 'wink']),
+  eyeColor: z.enum(['#293747', '#334155', '#6b432d', '#3f8f82', '#6b9fff', '#8b5cf6']),
   brows: z.enum(['soft', 'straight', 'arched']),
-  mouth: z.enum(['smile', 'neutral', 'open']),
-  accessory: z.enum(['none', 'glasses', 'round-glasses', 'cap', 'beanie']),
-  clothing: z.enum(['tee', 'shirt', 'hoodie', 'sweater']),
-  clothingColor: z.enum(['#4fd1a5', '#6b9fff', '#f472b6', '#f0b84a', '#a78bfa', '#f07070', '#334155', '#f8fafc']),
+  mouth: z.enum(['smile', 'neutral', 'open', 'grin', 'surprised', 'smirk', 'pout']),
+  faceShape: z.enum(['soft', 'oval', 'round', 'angular']),
+  accessory: z.enum(['none', 'glasses', 'round-glasses', 'cap', 'beanie', 'star-pin', 'bow', 'scarf', 'headphones', 'bandana', 'leaf', 'flower', 'shell', 'antenna', 'helmet', 'pirate-hat', 'wizard-hat', 'chef-hat', 'mask', 'hat']),
+  accessories: z.array(z.enum([
+    'cap', 'beanie', 'hat', 'beret', 'crown', 'headband', 'flower-crown', 'cowboy-hat', 'visor', 'helmet', 'pirate-hat', 'wizard-hat', 'chef-hat', 'antenna', 'halo',
+    'wig-afro', 'wig-braids', 'wig-rainbow', 'wig-copper', 'wig-mohawk',
+    'glasses', 'round-glasses', 'sunglasses', 'heart-glasses', 'star-glasses', 'safety-goggles', 'monocle', 'mask', 'masquerade-mask', 'domino-mask', 'face-paint-stars', 'face-paint-stripe', 'freckles', 'scar', 'whisker-paint',
+    'beard-stubble', 'beard-short', 'beard-full', 'beard-goatee', 'beard-viking', 'moustache', 'moustache-curly', 'moustache-handlebar',
+    'cat-ears', 'bunny-ears', 'devil-horns', 'antlers', 'top-hat', 'knight-helmet', 'nurse-cap', 'crescent-crown', 'star-headband',
+    'bun', 'twin-buns', 'wavy-bob', 'fringe', 'undercut', 'flower-barrette',
+    'square-glasses', 'aviators', 'eye-patch', 'robot-visor', 'gas-mask', 'nose-ring', 'lip-piercing', 'beauty-mark', 'cheek-hearts', 'freckles-gold',
+    'beard-long', 'beard-braided', 'beard-shadow', 'moustache-pencil', 'moustache-walrus', 'earrings-drop', 'earphones', 'choker', 'necklace-moon', 'neck-ribbon', 'backpack', 'wings', 'magic-aura', 'sparkle-orbit',
+    'earrings-hoop', 'earrings-stud', 'ear-cuff', 'headphones', 'headset',
+    'scarf', 'bandana', 'tie', 'bowtie', 'necklace-star', 'necklace-pearl', 'star-pin', 'bow', 'flower', 'leaf', 'shell', 'medal', 'patch',
+  ])).max(12)
+    .refine((items) => new Set(items).size === items.length, 'No repitas accesorios.')
+    .refine((items) => AVATAR_ACCESSORY_SLOTS.every((slot) => items.filter((id) => slot.includes(id)).length <= 1), 'Hay accesorios que ocupan la misma zona.')
+    .refine((items) => {
+      const incompatiblePairs = new Set([
+        'eye-patch|glasses', 'eye-patch|round-glasses', 'eye-patch|square-glasses', 'eye-patch|aviators', 'eye-patch|sunglasses', 'eye-patch|heart-glasses', 'eye-patch|star-glasses', 'eye-patch|safety-goggles',
+        'masquerade-mask|glasses', 'masquerade-mask|round-glasses', 'masquerade-mask|square-glasses', 'masquerade-mask|aviators', 'masquerade-mask|sunglasses', 'masquerade-mask|heart-glasses', 'masquerade-mask|star-glasses', 'masquerade-mask|safety-goggles',
+        'domino-mask|glasses', 'domino-mask|round-glasses', 'domino-mask|square-glasses', 'domino-mask|aviators', 'domino-mask|sunglasses', 'domino-mask|heart-glasses', 'domino-mask|star-glasses', 'domino-mask|safety-goggles',
+        'robot-visor|glasses', 'robot-visor|round-glasses', 'robot-visor|square-glasses', 'robot-visor|aviators', 'robot-visor|sunglasses', 'robot-visor|heart-glasses', 'robot-visor|star-glasses', 'robot-visor|safety-goggles',
+        'gas-mask|glasses', 'gas-mask|round-glasses', 'gas-mask|square-glasses', 'gas-mask|aviators', 'gas-mask|sunglasses', 'gas-mask|heart-glasses', 'gas-mask|star-glasses', 'gas-mask|safety-goggles',
+        ...['beard-full', 'beard-long', 'beard-braided', 'beard-viking'].flatMap((beard) => ['moustache', 'moustache-curly', 'moustache-handlebar', 'moustache-pencil', 'moustache-walrus'].map((moustache) => `${beard}|${moustache}`)),
+      ]);
+      const hasOcclusion = items.some((left, index) => items.slice(index + 1).some((right) => incompatiblePairs.has([left, right].sort().join('|'))));
+      const hasHeadwearHairClip = hasGroup(items, AVATAR_OVERLAP_GROUPS.headwear) && hasGroup(items, AVATAR_OVERLAP_GROUPS.hairClips);
+      const hasMaskFacialHair = hasGroup(items, AVATAR_OVERLAP_GROUPS.masks) && hasGroup(items, AVATAR_OVERLAP_GROUPS.facialHair);
+      const hasAudioEarrings = hasGroup(items, AVATAR_OVERLAP_GROUPS.audio) && hasGroup(items, AVATAR_OVERLAP_GROUPS.earrings);
+      const hasNeckwearNecklace = hasGroup(items, AVATAR_OVERLAP_GROUPS.neckwear) && hasGroup(items, AVATAR_OVERLAP_GROUPS.necklaces);
+      return !hasOcclusion && !hasHeadwearHairClip && !hasMaskFacialHair && !hasAudioEarrings && !hasNeckwearNecklace;
+    }, 'Hay accesorios que se superponen y no pueden combinarse.'),
+  clothing: z.enum(['tee', 'shirt', 'hoodie', 'sweater', 'dress', 'suit', 'cape', 'jacket', 'sport', 'uniform', 'armor', 'robe', 'overalls', 'raincoat', 'blazer']),
+  clothingColor: z.enum(['#211814', '#38251f', '#a65324', '#e0b85b', '#8b5cf6', '#e879a9', '#4fd1a5', '#6b9fff', '#f472b6', '#a78bfa', '#f0b84a', '#f07070', '#334155', '#f8fafc', '#94a3b8']),
 }).strict();
 
 const auth = {

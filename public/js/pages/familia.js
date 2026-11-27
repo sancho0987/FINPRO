@@ -20,10 +20,12 @@ export async function render({ root, isCurrent }) {
       ${canManage ? html`<div class="actions"><button class="btn btn-primary" type="button" data-add-member>${raw(icon('plus'))}Añadir miembro</button></div>` : ''}</div>
     <div class="members">
       ${s.byMember.map((m) => html`<article class="member" style="--c:${m.color}">
-        ${canManage ? html`<div class="m-actions"><button class="btn btn-icon" type="button" data-avatar="${m.id}" title="Personalizar avatar" aria-label="Personalizar avatar de ${m.name}">✦</button><button class="btn btn-icon" type="button" data-edit="${m.id}" aria-label="Editar ${m.name}">${raw(icon('edit'))}</button>
-          <button class="btn btn-icon danger" type="button" data-del="${m.id}" aria-label="Eliminar ${m.name}">${raw(icon('trash'))}</button></div>
+        ${canManage ? html`<div class="m-actions"><button class="btn btn-icon danger" type="button" data-del="${m.id}" aria-label="Eliminar ${m.name}" title="Eliminar integrante">${raw(icon('trash'))}</button></div>
         ` : ''}
-        <div class="m-ava">${avatarMarkup(m.avatar, { size: 66, label: `Avatar de ${m.name}`, background: m.color })}</div><h3>${m.name}</h3><span class="role">${m.role}</span>
+        ${canManage
+          ? html`<button class="m-ava member-avatar-trigger" type="button" data-avatar="${m.id}" title="Personalizar avatar" aria-label="Personalizar avatar de ${m.name}">${memberAvatar(m)}</button>`
+          : html`<div class="m-ava">${memberAvatar(m)}</div>`}<h3>${m.name}</h3><span class="role">${m.role}</span>
+        ${canManage ? html`<button class="member-edit-link" type="button" data-edit="${m.id}" aria-label="Editar datos de ${m.name}">Editar datos</button>` : ''}
         <div class="m-amt">${m.spent > 0 ? money(m.spent) : '—'}</div>
         <div class="m-sub">${m.count} gasto(s) · ${share(m.spent)}% del total</div>
         <div class="track" style="--c:${m.color}"><i data-w="${share(m.spent)}"></i></div></article>`)}
@@ -52,4 +54,8 @@ export async function render({ root, isCurrent }) {
     const ed = e.target.closest('[data-edit]'); if (ed) return openMemberModal(app.members.find((m) => String(m.id) === ed.dataset.edit));
     const del = e.target.closest('[data-del]'); if (del) return deleteMember(app.members.find((m) => String(m.id) === del.dataset.del));
   });
+}
+
+function memberAvatar(member) {
+  return avatarMarkup(member.avatar, { size: 76, label: `Avatar de ${member.name}`, background: member.color });
 }

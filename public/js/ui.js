@@ -24,7 +24,7 @@ export function toast(message, type = 'ok') {
 
 // ── Modales ──
 let lastFocus = null;
-export function openModal(content, { onClose, label = 'Diálogo' } = {}) {
+export function openModal(content, { onClose, canClose, label = 'Diálogo' } = {}) {
   lastFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
@@ -34,6 +34,7 @@ export function openModal(content, { onClose, label = 'Diálogo' } = {}) {
   const modal = $('.modal', overlay);
 
   const close = (result) => {
+    if (canClose && !canClose()) return;
     document.removeEventListener('keydown', onKey, true);
     overlay.remove();
     if (!$$('.overlay').length) document.body.style.overflow = '';
